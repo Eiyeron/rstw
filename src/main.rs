@@ -40,10 +40,10 @@ impl<'a> HitRecord<'a> {
             else {
                 -outward_normal
             }
-        };
-        (front_facing, normal)
-    }
-    pub fn from(t:f64, p:Vector3<f64>, incoming:Vector3<f64>, normal:Vector3<f64>, material:&dyn Material) -> HitRecord {
+    };
+    (front_facing, normal)
+}
+pub fn from(t:f64, p:Vector3<f64>, incoming:Vector3<f64>, normal:Vector3<f64>, material:&dyn Material) -> HitRecord {
         let(front_facing, normal) = HitRecord::set_face_normal(incoming, normal);
         HitRecord {
             t:t,
@@ -309,6 +309,28 @@ fn epsilon_equal(a:f64, b:f64, epsilon:f64) -> bool {
     (a - b).abs() < epsilon
 }
 
+fn reflect(i:&Vector3<f64>, n:&Vector3<f64>) -> Vector3<f64> {
+    i - n * (n.dot(i) * 2.0)
+}
+
+pub fn refract(i: &Vector3<f64>, n: &Vector3<f64>, eta: f64) -> Vector3<f64>
+{
+    let ni = Vector3::dot(n, i);
+    let k:f64 = 1.0 - eta.powi(2) * (1.0 - ni.powi(2));
+
+    if k < 0.0 {
+        Vector3::new(0.0, 0.0, 0.0)
+    } else {
+        i * eta - n * (eta * ni + k.sqrt())
+    }
+}
+
+fn schlick_reflectance(cosine:f64, ref_idx:f64) -> f64 {
+    let r0 = (1.0 - ref_idx) / (1.0 + ref_idx);
+    let r0_2 = r0.powi(2);
+    r0_2 + (1.0 - r0_2) * (1.0 - cosine).powf(5.0)
+}
+
 impl Material for Lambertian {
     fn scatter(&self, _ray:&Ray, rec:&HitRecord) -> Option<(Ray, Vector3<f64>)> {
         let v: [f64; 3] = UnitSphere.sample(&mut rand::thread_rng());
@@ -323,6 +345,79 @@ impl Material for Lambertian {
         }
 
         Some((Ray{origin:rec.p, direction:scatter_direction}, self.albedo))
+    }
+}
+
+struct Metal {
+    albedo:Vector3<f64>,
+    roughness:f64
+}
+
+impl Material for Metal {
+    fn scatter(&self, ray:&Ray, rec:&HitRecord) -> Option<(Ray, Vector3<f64>)> {
+        let v: [f64; 3] = UnitSphere.sample(&mut rand::thread_rng());
+
+        let unit_direction = ray.direction.normalize();
+
+        let refraction_ratio = {
+            if rec.front_facing {
+                1. / /*self.ior*/ 2.5
+            } else {
+                /*self.ior*/ 2.5
+            }
+        };
+        let cos_theta = (-unit_direction).dot(&rec.normal).min(1.0);
+        let attenuation =
+            self.albedo.lerp(&Vector3::new(1.0, 1.0, 1.0), schlick_reflectance(cos_theta, refraction_ratio));
+
+
+        let reflected = reflect(&ray.direction.normalize(), &rec.normal);
+        let scattered = Ray {
+            origin:rec.p,
+            direction: (reflected + self.roughness * Vector3::new(v[0], v[1], v[2])).normalize()
+        };
+        if scattered.direction.dot(&rec.normal) > 0.0 {
+            return Some((scattered, attenuation));
+        }
+        None
+    }
+}
+
+struct Dielectric {
+    ior:f64
+}
+
+impl Material for Dielectric {
+
+    fn scatter(&self, ray:&Ray, rec:&HitRecord) -> Option<(Ray, Vector3<f64>)> {
+        let attenuation = Vector3::new(1.0, 1.0, 1.0);
+        let unit_direction = ray.direction.normalize();
+
+        let refraction_ratio = {
+            if rec.front_facing {
+                1. / self.ior
+            } else {
+                self.ior
+            }
+        };
+
+        let cos_theta = (-unit_direction).dot(&rec.normal).min(1.0);
+        let sin_theta = (1. - cos_theta.powi(2)).sqrt();
+
+        let outward = {
+            let probability = Uniform::from(0.0..1.0).sample(&mut rand::thread_rng());
+            if refraction_ratio * sin_theta > 1. || schlick_reflectance(cos_theta, refraction_ratio) > probability {
+                reflect(&unit_direction, &rec.normal)
+            }
+            else {
+                refract(&unit_direction, &rec.normal, refraction_ratio)
+            }
+        };
+        let scattered = Ray{
+            origin:rec.p,
+            direction: outward
+        };
+        Some((scattered, attenuation))
     }
 }
 
@@ -354,34 +449,53 @@ fn ray_color(ray:Ray, hittable:&dyn Hittable, depth:u16) -> Vector3<f64> {
 
     let unit_dir = ray.direction.normalize();
     let t = 0.5 * (unit_dir.y + 1.0);
-    Vector3::new(0.0, 0.0, 0.0).lerp(&Vector3::new(1.0, 1.0, 1.0), t)
+    // Vector3::new(0.0, 0.0, 0.0).lerp(&Vector3::new(1.0, 1.0, 1.0), t)
+    Vector3::new(1.0, 1.0, 1.0).lerp(&Vector3::new(0.5, 0.7, 1.0), t)
 
 }
 
 fn main() {
     let max_depth = 50;
-    let num_iterations = 1000;
+    let num_iterations = 100;
+    let aspect_ratio = 16.0 / 9.0;
     let render_width= 2560;
-    let render_height = 1440;
-    let eye = Vector3::new(0.0, 5.0, -10.0);
+    let render_height = (render_width as f64 / aspect_ratio) as i32;
+    let eye = Vector3::new(0.0, 2.0, -5.0);
     let target = Vector3::new(0.0, 0.0, 0.0);
     let cam = Camera::new(eye, target, Vector3::new(0.0, 1.0, 0.0),
         60.,
-        render_width as f64 / render_height as f64,
-        1.0 , // Aperture
+        aspect_ratio,
+        0.0 , // Aperture
         (eye - target).norm());
 
     let lambertian:Rc<dyn Material> = Rc::new(Lambertian{ albedo: Vector3::new(0.2, 0.4, 0.6) });
-    let lambertian_2:Rc<dyn Material> = Rc::new(Lambertian{ albedo: Vector3::new(0.8, 0.8, 0.8) });
+    let lambertian_2:Rc<dyn Material> = Rc::new(Lambertian{ albedo: Vector3::new(0.6, 0.6, 0.6) });
+    let metal:Rc<dyn Material> = Rc::new(Metal{ albedo: Vector3::new(0.7, 0.6, 0.5), roughness:0.0 });
+    let glass:Rc<dyn Material> = Rc::new(Dielectric {ior: 1.5});
 
     let mut objects:Vec<Rc<dyn Hittable>> = Vec::new();
-    for y in -5..5 {
+    objects.push(Rc::new(Sphere {
+        center: Vector3::new(0.0, -1005.0, 0.0),
+        radius: 1000.0,
+        material: lambertian_2
+    }));
+    for y in (-5..5).step_by(3) {
         for x in -10..10 {
             let r = f64::hypot(x as f64, y as f64);
             objects.push(Rc::new(Sphere {
                 center: Vector3::new((x * 3) as f64, 0.0, (y * 3) as f64),
                 radius:r/5. + 0.2,
-                material: Rc::clone(&lambertian)
+                material: lambertian.clone()
+            }));
+            objects.push(Rc::new(Sphere {
+                center: Vector3::new((x * 3) as f64, 0.0, ((y + 1) * 3) as f64),
+                radius:r/5. + 0.2,
+                material: metal.clone()
+            }));
+            objects.push(Rc::new(Sphere {
+                center: Vector3::new((x * 3) as f64, 0.0, ((y + 2) * 3) as f64),
+                radius:r/5. + 0.2 + 0.6,
+                material: glass.clone()
             }));
         }
     }
@@ -397,8 +511,10 @@ fn main() {
             let mut sum = Vector3::new(0.0, 0.0, 0.0);
             for _sample in 0..num_iterations {
                 // TODO Add jittering for subpixel sampling
-                let s = x as f64/(render_width as f64 - 1.0);
-                let t = 1.0 - (y as f64/(render_height as f64 - 1.0));
+                let jitter_x = Uniform::from(0.0..1.0).sample(&mut rand::thread_rng());
+                let jitter_y = Uniform::from(0.0..1.0).sample(&mut rand::thread_rng());
+                let s = (jitter_x + (x as f64))/(render_width as f64 - 1.0);
+                let t = 1.0 - (jitter_y + (y as f64))/(render_height as f64 - 1.0);
 
                 let ray = cam.get_ray(s, t);
                 sum += ray_color(ray, &world, max_depth);
