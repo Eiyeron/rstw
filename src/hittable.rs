@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 pub trait Hittable {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
-    fn bounding_box(&self) -> Option<AABB>;
+    fn bounding_box(&self, t0: f64, t1: f64) -> Option<AABB>;
 }
 
 pub struct Sphere {
@@ -48,12 +48,75 @@ impl Hittable for Sphere {
         ))
     }
 
-    fn bounding_box(&self) -> Option<AABB> {
+    fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
         let radius_vector = Vector3::from_element(self.radius);
         Some(AABB {
             min: self.center - radius_vector,
             max: self.center + radius_vector,
         })
+    }
+}
+
+pub struct MovingSphere {
+    pub center_begin: Vec3,
+    pub center_end: Vec3,
+    pub time_begin: f64,
+    pub time_end: f64,
+    pub radius: f64,
+    pub material: Rc<dyn Material>,
+}
+
+impl MovingSphere {
+    fn center_at(&self, t: f64) -> Vec3 {
+        let ratio = (t - self.time_begin) / (self.time_end - self.time_begin);
+        self.center_begin.lerp(&self.center_end, ratio)
+    }
+}
+
+impl Hittable for MovingSphere {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let center_at_time = self.center_at(ray.time);
+        let oc = ray.origin - center_at_time;
+        let a = ray.direction.norm_squared();
+        let half_b = oc.dot(&ray.direction);
+        let c = oc.norm_squared() - self.radius.powi(2);
+
+        let discriminant = a.mul_add(-c, half_b.powi(2));
+        if discriminant < 0.0 {
+            return None;
+        }
+        let sqrtd = discriminant.sqrt();
+
+        let mut root = (-half_b - sqrtd) / a;
+        if root < t_min || root > t_max {
+            root = (-half_b + sqrtd) / a;
+            if root < t_min || root > t_max {
+                return None;
+            }
+        }
+
+        let p = ray.at(root);
+        let outward_normal = (p - center_at_time) / self.radius;
+        Some(HitRecord::from(
+            root,
+            p,
+            ray.direction,
+            outward_normal,
+            self.material.as_ref(),
+        ))
+    }
+
+    fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
+        let radius_vector = Vec3::from_element(self.radius);
+        let box_at_begin = AABB {
+            min: self.center_begin - radius_vector,
+            max: self.center_begin + radius_vector,
+        };
+        let box_at_end = AABB {
+            min: self.center_end - radius_vector,
+            max: self.center_end + radius_vector,
+        };
+        Some(AABB::union(&box_at_begin, &box_at_end))
     }
 }
 
@@ -71,21 +134,21 @@ impl BvhNode {
             1 => BvhNode {
                 left: data[0].clone(),
                 right: data[0].clone(),
-                node_box: data[0].as_ref().bounding_box().unwrap_or(AABB {
-                    min: Vector3::zeros(),
-                    max: Vector3::zeros(),
+                node_box: data[0].as_ref().bounding_box(t0, t1).unwrap_or(AABB {
+                    min: Vec3::zeros(),
+                    max: Vec3::zeros(),
                 }),
             },
             2 => {
                 let left = data[0].as_ref();
                 let right = data[1].as_ref();
-                let box_left = left.bounding_box().unwrap_or(AABB {
-                    min: Vector3::zeros(),
-                    max: Vector3::zeros(),
+                let box_left = left.bounding_box(t0, t1).unwrap_or(AABB {
+                    min: Vec3::zeros(),
+                    max: Vec3::zeros(),
                 });
-                let box_right = right.bounding_box().unwrap_or(AABB {
-                    min: Vector3::zeros(),
-                    max: Vector3::zeros(),
+                let box_right = right.bounding_box(t0, t1).unwrap_or(AABB {
+                    min: Vec3::zeros(),
+                    max: Vec3::zeros(),
                 });
                 BvhNode {
                     left: data[0].clone(),
@@ -110,13 +173,13 @@ impl BvhNode {
 
                 let left = BvhNode::from_slice(left, t0, t1);
                 let right = BvhNode::from_slice(right, t0, t1);
-                let box_left = left.bounding_box().unwrap_or(AABB {
-                    min: Vector3::zeros(),
-                    max: Vector3::zeros(),
+                let box_left = left.bounding_box(t0, t1).unwrap_or(AABB {
+                    min: Vec3::zeros(),
+                    max: Vec3::zeros(),
                 });
-                let box_right = right.bounding_box().unwrap_or(AABB {
-                    min: Vector3::zeros(),
-                    max: Vector3::zeros(),
+                let box_right = right.bounding_box(t0, t1).unwrap_or(AABB {
+                    min: Vec3::zeros(),
+                    max: Vec3::zeros(),
                 });
                 BvhNode {
                     left: Rc::new(left),
@@ -128,8 +191,8 @@ impl BvhNode {
     }
 
     fn box_compare(a: &dyn Hittable, b: &dyn Hittable, axis: u8) -> std::cmp::Ordering {
-        let box_a = a.bounding_box();
-        let box_b = b.bounding_box();
+        let box_a = a.bounding_box(0.0, 0.0);
+        let box_b = b.bounding_box(0.0, 0.0);
         if box_a.is_none() || box_b.is_none() {
             eprintln!("No bbox in BvhNode constructor");
         }
@@ -166,7 +229,7 @@ impl Hittable for BvhNode {
         return self.right.as_ref().hit(&ray, t_min, t_max);
     }
 
-    fn bounding_box(&self) -> Option<AABB> {
+    fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
         Some(AABB {
             min: self.node_box.min,
             max: self.node_box.max,

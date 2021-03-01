@@ -1,5 +1,5 @@
-use crate::{HitRecord, Ray};
 use crate::Vec3;
+use crate::{HitRecord, Ray};
 use nalgebra::Vector3;
 use rand_distr::{Distribution, Uniform, UnitSphere};
 
@@ -21,7 +21,7 @@ pub struct Dielectric {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, _ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)> {
+    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)> {
         let v: [f64; 3] = UnitSphere.sample(&mut rand::thread_rng());
         let mut scatter_direction = rec.normal + Vector3::from_row_slice(&v);
 
@@ -36,6 +36,7 @@ impl Material for Lambertian {
             Ray {
                 origin: rec.p,
                 direction: scatter_direction,
+                time: ray.time,
             },
             self.albedo,
         ))
@@ -66,6 +67,7 @@ impl Material for Metal {
         let scattered = Ray {
             origin: rec.p,
             direction: (reflected + self.roughness * Vec3::new(v[0], v[1], v[2])).normalize(),
+            time: ray.time,
         };
         if scattered.direction.dot(&rec.normal) > 0.0 {
             return Some((scattered, attenuation));
@@ -103,6 +105,7 @@ impl Material for Dielectric {
         let scattered = Ray {
             origin: rec.p,
             direction: outward,
+            time: ray.time,
         };
         Some((scattered, attenuation))
     }
