@@ -1,17 +1,18 @@
 use crate::{HitRecord, Ray};
+use crate::Vec3;
 use nalgebra::Vector3;
 use rand_distr::{Distribution, Uniform, UnitSphere};
 
 pub trait Material {
-    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vector3<f64>)>;
+    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)>;
 }
 
 pub struct Lambertian {
-    pub albedo: Vector3<f64>,
+    pub albedo: Vec3,
 }
 
 pub struct Metal {
-    pub albedo: Vector3<f64>,
+    pub albedo: Vec3,
     pub roughness: f64,
 }
 
@@ -20,7 +21,7 @@ pub struct Dielectric {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, _ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vector3<f64>)> {
+    fn scatter(&self, _ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)> {
         let v: [f64; 3] = UnitSphere.sample(&mut rand::thread_rng());
         let mut scatter_direction = rec.normal + Vector3::from_row_slice(&v);
 
@@ -42,7 +43,7 @@ impl Material for Lambertian {
 }
 
 impl Material for Metal {
-    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vector3<f64>)> {
+    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)> {
         let v: [f64; 3] = UnitSphere.sample(&mut rand::thread_rng());
 
         let unit_direction = ray.direction.normalize();
@@ -57,14 +58,14 @@ impl Material for Metal {
         };
         let cos_theta = (-unit_direction).dot(&rec.normal).min(1.0);
         let attenuation = self.albedo.lerp(
-            &Vector3::new(1.0, 1.0, 1.0),
+            &Vec3::new(1.0, 1.0, 1.0),
             schlick_reflectance(cos_theta, refraction_ratio),
         );
 
         let reflected = reflect(&ray.direction.normalize(), &rec.normal);
         let scattered = Ray {
             origin: rec.p,
-            direction: (reflected + self.roughness * Vector3::new(v[0], v[1], v[2])).normalize(),
+            direction: (reflected + self.roughness * Vec3::new(v[0], v[1], v[2])).normalize(),
         };
         if scattered.direction.dot(&rec.normal) > 0.0 {
             return Some((scattered, attenuation));
@@ -74,8 +75,8 @@ impl Material for Metal {
 }
 
 impl Material for Dielectric {
-    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vector3<f64>)> {
-        let attenuation = Vector3::new(1.0, 1.0, 1.0);
+    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)> {
+        let attenuation = Vec3::new(1.0, 1.0, 1.0);
         let unit_direction = ray.direction.normalize();
 
         let refraction_ratio = {
@@ -111,11 +112,11 @@ fn epsilon_equal(a: f64, b: f64, epsilon: f64) -> bool {
     (a - b).abs() < epsilon
 }
 
-fn reflect(i: &Vector3<f64>, n: &Vector3<f64>) -> Vector3<f64> {
+fn reflect(i: &Vec3, n: &Vec3) -> Vec3 {
     i - n * (n.dot(i) * 2.0)
 }
 
-fn refract(i: &Vector3<f64>, n: &Vector3<f64>, eta: f64) -> Vector3<f64> {
+fn refract(i: &Vec3, n: &Vec3, eta: f64) -> Vec3 {
     let ni = Vector3::dot(n, i);
     let k: f64 = 1.0 - eta.powi(2) * (1.0 - ni.powi(2));
 

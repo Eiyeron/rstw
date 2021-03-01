@@ -1,5 +1,6 @@
 use crate::material::Material;
-use crate::{HitRecord, Ray, AABB};
+use crate::math::*;
+use crate::{HitRecord, Ray};
 use nalgebra::Vector3;
 use rand_distr::{Distribution, Uniform};
 use std::rc::Rc;
@@ -10,7 +11,7 @@ pub trait Hittable {
 }
 
 pub struct Sphere {
-    pub center: Vector3<f64>,
+    pub center: Vec3,
     pub radius: f64,
     pub material: Rc<dyn Material>,
 }
