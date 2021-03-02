@@ -22,7 +22,7 @@ pub struct Dielectric {
 
 impl Material for Lambertian {
     fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)> {
-        let v: [f64; 3] = UnitSphere.sample(&mut rand::thread_rng());
+        let v = UnitSphere.sample(&mut rand::thread_rng());
         let mut scatter_direction = rec.normal + Vector3::from_row_slice(&v);
 
         let ee_x = epsilon_equal(scatter_direction.x, 0.0, 1.0e-8);
@@ -78,7 +78,7 @@ impl Material for Metal {
 
 impl Material for Dielectric {
     fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)> {
-        let attenuation = Vec3::new(1.0, 1.0, 1.0);
+        let attenuation = Vec3::from_element(1.0);
         let unit_direction = ray.direction.normalize();
 
         let refraction_ratio = {

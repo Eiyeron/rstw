@@ -5,7 +5,7 @@ mod writers;
 
 use hittable::*;
 use material::*;
-use math::Vec3;
+use math::*;
 use rand_distr::{Distribution, Uniform, UnitDisc};
 use std::rc::Rc;
 use writers::*;
@@ -253,19 +253,13 @@ fn book_cover_scene() -> BvhNode {
             let selector = material_distribution.sample(thread_rng);
             let material: Rc<dyn Material> = match selector {
                 0 => {
-                    let albedo = Vec3::new(
-                        uniform_dist.sample(thread_rng) * uniform_dist.sample(thread_rng),
-                        uniform_dist.sample(thread_rng) * uniform_dist.sample(thread_rng),
-                        uniform_dist.sample(thread_rng) * uniform_dist.sample(thread_rng),
-                    );
+                    let a1 = generate_vector(&uniform_dist);
+                    let a2 = generate_vector(&uniform_dist);
+                    let albedo = Vec3::new(a1.x * a2.x, a1.y * a2.y, a1.z * a2.z);
                     Rc::new(Lambertian { albedo })
                 }
                 1 => {
-                    let albedo = Vec3::new(
-                        metal_dist.sample(thread_rng),
-                        metal_dist.sample(thread_rng),
-                        metal_dist.sample(thread_rng),
-                    );
+                    let albedo = generate_vector(&metal_dist);
                     Rc::new(Metal {
                         albedo,
                         roughness: metal_roughness_dist.sample(thread_rng),
@@ -298,13 +292,34 @@ fn book_cover_scene() -> BvhNode {
         }
     }
 
-    let mat1:Rc<dyn Material> = Rc::new(Dielectric{ior: 1.5});
-    world_elements.push(Rc::new(Sphere {center: big_sphere_pos_1, radius: 1.0, material: Rc::clone(&mat1)}));
-    world_elements.push(Rc::new(Sphere {center: big_sphere_pos_1, radius: -0.8, material: mat1}));
-    let mat2:Rc<dyn Material> = Rc::new(Lambertian{albedo: Vec3::new(0.4, 0.2, 0.1)});
-    world_elements.push(Rc::new(Sphere {center: big_sphere_pos_2, radius: 1.0, material: mat2}));
-    let mat3:Rc<dyn Material> = Rc::new(Metal{albedo: Vec3::new(0.7, 0.6, 0.5), roughness: 0.0});
-    world_elements.push(Rc::new(Sphere {center: big_sphere_pos_3, radius: 1.0, material: mat3}));
+    let mat1: Rc<dyn Material> = Rc::new(Dielectric { ior: 1.5 });
+    world_elements.push(Rc::new(Sphere {
+        center: big_sphere_pos_1,
+        radius: 1.0,
+        material: Rc::clone(&mat1),
+    }));
+    world_elements.push(Rc::new(Sphere {
+        center: big_sphere_pos_1,
+        radius: -0.8,
+        material: mat1,
+    }));
+    let mat2: Rc<dyn Material> = Rc::new(Lambertian {
+        albedo: Vec3::new(0.4, 0.2, 0.1),
+    });
+    world_elements.push(Rc::new(Sphere {
+        center: big_sphere_pos_2,
+        radius: 1.0,
+        material: mat2,
+    }));
+    let mat3: Rc<dyn Material> = Rc::new(Metal {
+        albedo: Vec3::new(0.7, 0.6, 0.5),
+        roughness: 0.0,
+    });
+    world_elements.push(Rc::new(Sphere {
+        center: big_sphere_pos_3,
+        radius: 1.0,
+        material: mat3,
+    }));
     BvhNode::from_slice(&world_elements[..], 0.0, f64::INFINITY)
 }
 

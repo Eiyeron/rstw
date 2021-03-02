@@ -18,34 +18,16 @@ pub struct Sphere {
 
 impl Hittable for Sphere {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
-        let oc = ray.origin - self.center;
-        let a = ray.direction.norm_squared();
-        let half_b = oc.dot(&ray.direction);
-        let c = oc.norm_squared() - self.radius.powi(2);
-
-        let discriminant = a.mul_add(-c, half_b.powi(2));
-        if discriminant < 0.0 {
-            return None;
+        match ray_sphere_intersection(&self.center, self.radius, &ray, t_min, t_max) {
+            Some((root, point, normal)) => Some(HitRecord::from(
+                root,
+                point,
+                ray.direction,
+                normal,
+                self.material.as_ref(),
+            )),
+            None => None,
         }
-        let sqrtd = discriminant.sqrt();
-
-        let mut root = (-half_b - sqrtd) / a;
-        if root < t_min || root > t_max {
-            root = (-half_b + sqrtd) / a;
-            if root < t_min || root > t_max {
-                return None;
-            }
-        }
-
-        let p = ray.at(root);
-        let outward_normal = (p - self.center) / self.radius;
-        Some(HitRecord::from(
-            root,
-            p,
-            ray.direction,
-            outward_normal,
-            self.material.as_ref(),
-        ))
     }
 
     fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
@@ -76,34 +58,16 @@ impl MovingSphere {
 impl Hittable for MovingSphere {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         let center_at_time = self.center_at(ray.time);
-        let oc = ray.origin - center_at_time;
-        let a = ray.direction.norm_squared();
-        let half_b = oc.dot(&ray.direction);
-        let c = oc.norm_squared() - self.radius.powi(2);
-
-        let discriminant = a.mul_add(-c, half_b.powi(2));
-        if discriminant < 0.0 {
-            return None;
+        match ray_sphere_intersection(&center_at_time, self.radius, &ray, t_min, t_max) {
+            Some((root, point, normal)) => Some(HitRecord::from(
+                root,
+                point,
+                ray.direction,
+                normal,
+                self.material.as_ref(),
+            )),
+            None => None,
         }
-        let sqrtd = discriminant.sqrt();
-
-        let mut root = (-half_b - sqrtd) / a;
-        if root < t_min || root > t_max {
-            root = (-half_b + sqrtd) / a;
-            if root < t_min || root > t_max {
-                return None;
-            }
-        }
-
-        let p = ray.at(root);
-        let outward_normal = (p - center_at_time) / self.radius;
-        Some(HitRecord::from(
-            root,
-            p,
-            ray.direction,
-            outward_normal,
-            self.material.as_ref(),
-        ))
     }
 
     fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
@@ -235,4 +199,34 @@ impl Hittable for BvhNode {
             max: self.node_box.max,
         })
     }
+}
+
+fn ray_sphere_intersection(
+    center: &Vec3,
+    radius: f64,
+    ray: &Ray,
+    t_min: f64,
+    t_max: f64,
+) -> Option<(f64, Vec3, Vec3)> {
+    let oc = ray.origin - center;
+    let a = ray.direction.norm_squared();
+    let half_b = oc.dot(&ray.direction);
+    let c = oc.norm_squared() - radius.powi(2);
+
+    let discriminant = a.mul_add(-c, half_b.powi(2));
+    if discriminant < 0.0 {
+        return None;
+    }
+    let sqrtd = discriminant.sqrt();
+
+    let mut root = (-half_b - sqrtd) / a;
+    if root < t_min || root > t_max {
+        root = (-half_b + sqrtd) / a;
+        if root < t_min || root > t_max {
+            return None;
+        }
+    }
+    let new_point = ray.at(root);
+    let outward_normal = (new_point - center) / radius;
+    Some((root, new_point, outward_normal))
 }

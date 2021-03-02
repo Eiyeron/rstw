@@ -1,4 +1,5 @@
 use crate::Ray;
+use rand::distributions::Distribution;
 
 pub type Vec3 = nalgebra::Vector3<f64>;
 
@@ -71,4 +72,13 @@ impl AABB {
             t_max,
         )
     }
+}
+
+pub fn generate_vector(dist: &impl Distribution<f64>) -> Vec3 {
+    let thread_rng = &mut rand::thread_rng();
+    Vec3::new(
+        dist.sample(thread_rng),
+        dist.sample(thread_rng),
+        dist.sample(thread_rng),
+    )
 }
