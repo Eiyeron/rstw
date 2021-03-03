@@ -1,10 +1,11 @@
 use crate::Vec3;
 use crate::{HitRecord, Ray};
 use nalgebra::Vector3;
+use rand::RngCore;
 use rand_distr::{Distribution, Uniform, UnitSphere};
 
 pub trait Material {
-    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)>;
+    fn scatter(&self, ray: &Ray, rec: &HitRecord, rng: &mut dyn RngCore) -> Option<(Ray, Vec3)>;
 }
 
 pub struct Lambertian {
@@ -21,8 +22,8 @@ pub struct Dielectric {
 }
 
 impl Material for Lambertian {
-    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)> {
-        let v = UnitSphere.sample(&mut rand::thread_rng());
+    fn scatter(&self, ray: &Ray, rec: &HitRecord, rng: &mut dyn RngCore) -> Option<(Ray, Vec3)> {
+        let v = UnitSphere.sample(rng);
         let mut scatter_direction = rec.normal + Vector3::from_row_slice(&v);
 
         let ee_x = epsilon_equal(scatter_direction.x, 0.0, 1.0e-8);
@@ -44,8 +45,8 @@ impl Material for Lambertian {
 }
 
 impl Material for Metal {
-    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)> {
-        let v: [f64; 3] = UnitSphere.sample(&mut rand::thread_rng());
+    fn scatter(&self, ray: &Ray, rec: &HitRecord, rng: &mut dyn RngCore) -> Option<(Ray, Vec3)> {
+        let v: [f64; 3] = UnitSphere.sample(rng);
 
         let unit_direction = ray.direction.normalize();
 
@@ -77,7 +78,7 @@ impl Material for Metal {
 }
 
 impl Material for Dielectric {
-    fn scatter(&self, ray: &Ray, rec: &HitRecord) -> Option<(Ray, Vec3)> {
+    fn scatter(&self, ray: &Ray, rec: &HitRecord, rng: &mut dyn RngCore) -> Option<(Ray, Vec3)> {
         let attenuation = Vec3::from_element(1.0);
         let unit_direction = ray.direction.normalize();
 
@@ -93,7 +94,7 @@ impl Material for Dielectric {
         let sin_theta = (1. - cos_theta.powi(2)).sqrt();
 
         let outward = {
-            let probability = Uniform::from(0.0..1.0).sample(&mut rand::thread_rng());
+            let probability = Uniform::from(0.0..1.0).sample(rng);
             if refraction_ratio * sin_theta > 1.
                 || schlick_reflectance(cos_theta, refraction_ratio) > probability
             {

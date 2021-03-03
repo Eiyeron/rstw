@@ -2,6 +2,7 @@ use crate::material::Material;
 use crate::math::*;
 use crate::{HitRecord, Ray};
 use nalgebra::Vector3;
+use rand::RngCore;
 use rand_distr::{Distribution, Uniform};
 use std::rc::Rc;
 
@@ -91,7 +92,12 @@ pub struct BvhNode {
 }
 
 impl BvhNode {
-    pub fn from_slice(data: &[Rc<dyn Hittable>], t0: f64, t1: f64) -> BvhNode {
+    pub fn from_slice(
+        data: &[Rc<dyn Hittable>],
+        t0: f64,
+        t1: f64,
+        rng: &mut impl RngCore,
+    ) -> BvhNode {
         let span = data.len();
         let mut copy = Vec::new();
         match span {
@@ -129,14 +135,14 @@ impl BvhNode {
                     BvhNode::box_compare(
                         left.as_ref(),
                         right.as_ref(),
-                        Uniform::from(0..3).sample(&mut rand::thread_rng()),
+                        Uniform::from(0..3).sample(rng),
                     )
                 });
                 let mid = span / 2;
                 let (left, right) = copy.split_at(mid);
 
-                let left = BvhNode::from_slice(left, t0, t1);
-                let right = BvhNode::from_slice(right, t0, t1);
+                let left = BvhNode::from_slice(left, t0, t1, rng);
+                let right = BvhNode::from_slice(right, t0, t1, rng);
                 let box_left = left.bounding_box(t0, t1).unwrap_or(AABB {
                     min: Vec3::zeros(),
                     max: Vec3::zeros(),
