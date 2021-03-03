@@ -1,19 +1,21 @@
+use crate::texture::Texture;
 use crate::Vec3;
 use crate::{HitRecord, Ray};
 use nalgebra::Vector3;
 use rand::RngCore;
 use rand_distr::{Distribution, Uniform, UnitSphere};
+use std::rc::Rc;
 
 pub trait Material {
     fn scatter(&self, ray: &Ray, rec: &HitRecord, rng: &mut dyn RngCore) -> Option<(Ray, Vec3)>;
 }
 
 pub struct Lambertian {
-    pub albedo: Vec3,
+    pub albedo: Rc<dyn Texture>,
 }
 
 pub struct Metal {
-    pub albedo: Vec3,
+    pub albedo: Rc<dyn Texture>,
     pub roughness: f64,
 }
 
@@ -39,7 +41,7 @@ impl Material for Lambertian {
                 direction: scatter_direction,
                 time: ray.time,
             },
-            self.albedo,
+            self.albedo.value(rec.u, rec.v, &rec.p),
         ))
     }
 }
@@ -59,7 +61,8 @@ impl Material for Metal {
             }
         };
         let cos_theta = (-unit_direction).dot(&rec.normal).min(1.0);
-        let attenuation = self.albedo.lerp(
+        let albedo_at_point = self.albedo.value(rec.u, rec.v, &rec.p);
+        let attenuation = albedo_at_point.lerp(
             &Vec3::new(1.0, 1.0, 1.0),
             schlick_reflectance(cos_theta, refraction_ratio),
         );

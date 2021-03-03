@@ -17,16 +17,30 @@ pub struct Sphere {
     pub material: Rc<dyn Material>,
 }
 
+impl Sphere {
+    pub fn get_uv(p: &Vec3) -> (f64, f64) {
+        let theta = (-p.y).acos();
+        let phi = f64::atan2(-p.z, p.x) + std::f64::consts::PI;
+
+        (phi / std::f64::consts::TAU, theta / std::f64::consts::PI)
+    }
+}
+
 impl Hittable for Sphere {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         match ray_sphere_intersection(&self.center, self.radius, &ray, t_min, t_max) {
-            Some((root, point, normal)) => Some(HitRecord::from(
-                root,
-                point,
-                ray.direction,
-                normal,
-                self.material.as_ref(),
-            )),
+            Some((root, point, normal)) => {
+                let (u, v) = Sphere::get_uv(&normal);
+                Some(HitRecord::from_uv(
+                    root,
+                    point,
+                    ray.direction,
+                    normal,
+                    self.material.as_ref(),
+                    u,
+                    v,
+                ))
+            }
             None => None,
         }
     }

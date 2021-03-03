@@ -2,6 +2,7 @@ mod hittable;
 mod material;
 mod math;
 mod render;
+mod texture;
 mod writers;
 
 use hittable::*;
@@ -13,6 +14,7 @@ use rand::SeedableRng;
 use rand_distr::{Distribution, Uniform};
 use render::*;
 use std::rc::Rc;
+use texture::*;
 use writers::*;
 
 fn ray_color(ray: Ray, hittable: &dyn Hittable, depth: u16, rng: &mut impl RngCore) -> Vec3 {
@@ -74,13 +76,17 @@ fn ray_color_loop(ray: Ray, hittable: &dyn Hittable, depth: u16, rng: &mut impl 
 
 fn wave_scene() -> BvhNode {
     let lambertian: Rc<dyn Material> = Rc::new(Lambertian {
-        albedo: Vec3::new(0.2, 0.4, 0.6),
+        albedo: Rc::new(SolidColor::new(0.2, 0.4, 0.6)),
     });
-    let lambertian_2: Rc<dyn Material> = Rc::new(Lambertian {
-        albedo: Vec3::new(0.6, 0.6, 0.6),
+
+    let checker = Rc::new(Checkerboard {
+        albedo_odd: Rc::new(SolidColor::new(0.2, 0.4, 0.6)),
+        albedo_even: Rc::new(SolidColor::new(0.6, 0.6, 0.2)),
     });
+
+    let lambertian_2: Rc<dyn Material> = Rc::new(Lambertian { albedo: checker });
     let metal: Rc<dyn Material> = Rc::new(Metal {
-        albedo: Vec3::new(0.7, 0.6, 0.5),
+        albedo: Rc::new(SolidColor::new(0.7, 0.6, 0.5)),
         roughness: 0.0,
     });
     let glass: Rc<dyn Material> = Rc::new(Dielectric { ior: 1.5 });
@@ -132,8 +138,14 @@ fn wave_scene() -> BvhNode {
 
 fn book_cover_scene() -> BvhNode {
     let mut world_elements: Vec<Rc<dyn Hittable>> = vec![];
+
+    let checker = Rc::new(Checkerboard {
+        albedo_odd: Rc::new(SolidColor::new(0.2, 0.4, 0.6)),
+        albedo_even: Rc::new(SolidColor::new(0.6, 0.6, 0.2)),
+    });
+
     let ground_mat = Rc::new(Metal {
-        albedo: Vec3::from_element(0.3),
+        albedo: checker,
         roughness: 0.1,
     });
     world_elements.push(Rc::new(Sphere {
@@ -174,11 +186,13 @@ fn book_cover_scene() -> BvhNode {
                 0 => {
                     let a1 = generate_vector(&uniform_dist, &mut rng);
                     let a2 = generate_vector(&uniform_dist, &mut rng);
-                    let albedo = Vec3::new(a1.x * a2.x, a1.y * a2.y, a1.z * a2.z);
+                    let albedo = Rc::new(SolidColor::new(a1.x * a2.x, a1.y * a2.y, a1.z * a2.z));
                     Rc::new(Lambertian { albedo })
                 }
                 1 => {
-                    let albedo = generate_vector(&metal_dist, &mut rng);
+                    let albedo = Rc::new(SolidColor {
+                        albedo: generate_vector(&metal_dist, &mut rng),
+                    });
                     Rc::new(Metal {
                         albedo,
                         roughness: metal_roughness_dist.sample(&mut rng),
@@ -223,7 +237,7 @@ fn book_cover_scene() -> BvhNode {
         material: mat1,
     }));
     let mat2: Rc<dyn Material> = Rc::new(Lambertian {
-        albedo: Vec3::new(0.4, 0.2, 0.1),
+        albedo: Rc::new(SolidColor::new(0.4, 0.2, 0.1)),
     });
     world_elements.push(Rc::new(Sphere {
         center: big_sphere_pos_2,
@@ -231,7 +245,7 @@ fn book_cover_scene() -> BvhNode {
         material: mat2,
     }));
     let mat3: Rc<dyn Material> = Rc::new(Metal {
-        albedo: Vec3::new(0.7, 0.6, 0.5),
+        albedo: Rc::new(SolidColor::new(0.7, 0.6, 0.5)),
         roughness: 0.0,
     });
     world_elements.push(Rc::new(Sphere {
@@ -246,7 +260,7 @@ fn book_cover_scene() -> BvhNode {
 
 fn main() {
     let max_depth = 50;
-    let num_iterations = 1000;
+    let num_iterations = 100;
     let aspect_ratio = 16.0 / 9.0;
     let render_width = 800;
     let render_height = (render_width as f64 / aspect_ratio) as u32;

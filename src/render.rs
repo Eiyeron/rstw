@@ -21,6 +21,8 @@ pub struct HitRecord<'a> {
     pub normal: Vec3,
     pub front_facing: bool,
     pub material: &'a dyn Material,
+    pub u: f64,
+    pub v: f64,
 }
 
 impl<'a> HitRecord<'a> {
@@ -49,6 +51,28 @@ impl<'a> HitRecord<'a> {
             normal,
             front_facing,
             material,
+            u: 0.0,
+            v: 0.0,
+        }
+    }
+    pub fn from_uv(
+        t: f64,
+        p: Vec3,
+        incoming: Vec3,
+        normal: Vec3,
+        material: &dyn Material,
+        u: f64,
+        v: f64,
+    ) -> HitRecord {
+        let (front_facing, normal) = HitRecord::set_face_normal(incoming, normal);
+        HitRecord {
+            t,
+            p,
+            normal,
+            front_facing,
+            material,
+            u,
+            v,
         }
     }
 }
