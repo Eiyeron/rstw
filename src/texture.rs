@@ -1,3 +1,4 @@
+use crate::noise::Perlin;
 use crate::Vec3;
 
 use std::rc::Rc;
@@ -14,6 +15,10 @@ pub struct SolidColor {
 pub struct Checkerboard {
     pub albedo_odd: Rc<dyn Texture>,
     pub albedo_even: Rc<dyn Texture>,
+}
+
+pub struct Noise {
+    pub perlin: Perlin,
 }
 
 impl SolidColor {
@@ -40,5 +45,11 @@ impl Texture for Checkerboard {
         } else {
             self.albedo_even.value(u, v, p)
         }
+    }
+}
+
+impl Texture for Noise {
+    fn value(&self, u: f64, v: f64, p: &Vec3) -> Vec3 {
+        Vec3::from_element(self.perlin.noise(p))
     }
 }

@@ -1,10 +1,12 @@
 mod hittable;
 mod material;
 mod math;
+mod noise;
 mod render;
 mod texture;
 mod writers;
 
+use crate::noise::Perlin;
 use hittable::*;
 use material::*;
 use math::*;
@@ -138,16 +140,18 @@ fn wave_scene() -> BvhNode {
 
 fn book_cover_scene() -> BvhNode {
     let mut world_elements: Vec<Rc<dyn Hittable>> = vec![];
+    let mut rng = SmallRng::seed_from_u64(0xDEADBEEF);
 
     let checker = Rc::new(Checkerboard {
         albedo_odd: Rc::new(SolidColor::new(0.2, 0.4, 0.6)),
         albedo_even: Rc::new(SolidColor::new(0.6, 0.6, 0.2)),
     });
 
-    let ground_mat = Rc::new(Metal {
-        albedo: checker,
-        roughness: 0.1,
+    let noise = Rc::new(Noise {
+        perlin: Perlin::new(&mut rng),
     });
+
+    let ground_mat = Rc::new(Lambertian { albedo: noise });
     world_elements.push(Rc::new(Sphere {
         center: Vec3::new(0.0, -1000.0, 0.0),
         radius: 1000.0,
@@ -159,7 +163,6 @@ fn book_cover_scene() -> BvhNode {
     let metal_dist = Uniform::from(0.5..1.0);
     let metal_roughness_dist = Uniform::from(0.0..0.5);
     let position_dist = Uniform::from(-0.9..0.9);
-    let mut rng = SmallRng::seed_from_u64(0xDEADBEEF);
     let glass_mat: Rc<dyn Material> = Rc::new(Dielectric { ior: 1.5 });
 
     let big_sphere_pos_1 = Vec3::new(0.0, 1.0, 0.0);

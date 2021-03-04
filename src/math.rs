@@ -78,3 +78,21 @@ impl AABB {
 pub fn generate_vector(dist: &impl Distribution<f64>, rng: &mut impl RngCore) -> Vec3 {
     Vec3::new(dist.sample(rng), dist.sample(rng), dist.sample(rng))
 }
+
+pub fn trilinear_interpolation(c: [[[f64; 2]; 2]; 2], u: f64, v: f64, w: f64) -> f64 {
+    let mut acc = 0.0;
+    for i in 0..2 {
+        for j in 0..2 {
+            for k in 0..2 {
+                let fi = i as f64;
+                let fj = j as f64;
+                let fk = k as f64;
+                let il = fi * u + (1.0 - fi) * (1.0 - u);
+                let jl = fj * v + (1.0 - fj) * (1.0 - v);
+                let kl = fk * w + (1.0 - fk) * (1.0 - w);
+                acc += il * jl * kl * c[i][j][k];
+            }
+        }
+    }
+    acc
+}
