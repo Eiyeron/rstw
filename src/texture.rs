@@ -19,6 +19,20 @@ pub struct Checkerboard {
 
 pub struct Noise {
     pub perlin: Perlin,
+    pub scale: f64
+}
+
+pub struct TurbulentNoise {
+    pub perlin: Perlin,
+    pub scale: f64,
+    pub depth: u32,
+}
+
+
+pub struct MarbleNoise {
+    pub perlin: Perlin,
+    pub scale: f64,
+    pub depth: u32,
 }
 
 impl SolidColor {
@@ -30,7 +44,7 @@ impl SolidColor {
 }
 
 impl Texture for SolidColor {
-    fn value(&self, u: f64, v: f64, p: &Vec3) -> Vec3 {
+    fn value(&self, _u: f64, _v: f64, _p: &Vec3) -> Vec3 {
         self.albedo
     }
 }
@@ -49,7 +63,34 @@ impl Texture for Checkerboard {
 }
 
 impl Texture for Noise {
-    fn value(&self, u: f64, v: f64, p: &Vec3) -> Vec3 {
-        Vec3::from_element(self.perlin.noise(p))
+    fn value(&self, _u: f64, _v: f64, p: &Vec3) -> Vec3 {
+        let scaled = p * self.scale;
+        Vec3::from_element((self.perlin.noise(&scaled)+ 1.0) / 2.0)
+    }
+}
+
+fn pertubation(perlin:&Perlin, depth:u32, p:&Vec3) -> f64 {
+    let mut acc = 0.0;
+    let mut scaled = *p;
+    let mut weight = 1.0;
+    for _i in 0..depth {
+        acc += perlin.noise(&scaled) * weight;
+        weight /= 2.0;
+        scaled *= 2.0;
+    }
+    acc.abs()
+}
+
+impl Texture for TurbulentNoise {
+    fn value(&self, _u: f64, _v: f64, p: &Vec3) -> Vec3 {
+        Vec3::from_element(pertubation(&self.perlin, self.depth, &p))
+    }
+}
+
+impl Texture for MarbleNoise {
+    fn value(&self, _u: f64, _v: f64, p: &Vec3) -> Vec3 {
+        let noise_value = pertubation(&self.perlin, self.depth, &p);
+        let v = (1.0 + f64::sin(10.0 * noise_value + self.scale * p.z)) / 2.0;
+        Vec3::from_element(v)
     }
 }

@@ -142,13 +142,15 @@ fn book_cover_scene() -> BvhNode {
     let mut world_elements: Vec<Rc<dyn Hittable>> = vec![];
     let mut rng = SmallRng::seed_from_u64(0xDEADBEEF);
 
-    let checker = Rc::new(Checkerboard {
+    let _checker = Rc::new(Checkerboard {
         albedo_odd: Rc::new(SolidColor::new(0.2, 0.4, 0.6)),
         albedo_even: Rc::new(SolidColor::new(0.6, 0.6, 0.2)),
     });
 
-    let noise = Rc::new(Noise {
+    let noise = Rc::new(MarbleNoise {
         perlin: Perlin::new(&mut rng),
+        scale: 4.,
+        depth: 5
     });
 
     let ground_mat = Rc::new(Lambertian { albedo: noise });
@@ -263,7 +265,7 @@ fn book_cover_scene() -> BvhNode {
 
 fn main() {
     let max_depth = 50;
-    let num_iterations = 100;
+    let num_iterations = 10;
     let aspect_ratio = 16.0 / 9.0;
     let render_width = 800;
     let render_height = (render_width as f64 / aspect_ratio) as u32;

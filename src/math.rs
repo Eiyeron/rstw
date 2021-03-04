@@ -79,7 +79,8 @@ pub fn generate_vector(dist: &impl Distribution<f64>, rng: &mut impl RngCore) ->
     Vec3::new(dist.sample(rng), dist.sample(rng), dist.sample(rng))
 }
 
-pub fn trilinear_interpolation(c: [[[f64; 2]; 2]; 2], u: f64, v: f64, w: f64) -> f64 {
+// Kept for reference
+pub fn _trilinear_interpolation(c: [[[f64; 2]; 2]; 2], u: f64, v: f64, w: f64) -> f64 {
     let mut acc = 0.0;
     for i in 0..2 {
         for j in 0..2 {
