@@ -43,7 +43,7 @@ fn ray_color(ray: Ray, hittable: &dyn Hittable, depth: u16, rng: &mut impl RngCo
     Vec3::new(1.0, 1.0, 1.0).lerp(&Vec3::new(0.5, 0.7, 1.0), t)
 }
 
-fn ray_color_loop(ray: Ray, hittable: &dyn Hittable, depth: u16, rng: &mut impl RngCore) -> Vec3 {
+fn _ray_color_loop(ray: Ray, hittable: &dyn Hittable, depth: u16, rng: &mut impl RngCore) -> Vec3 {
     let mut current_ray = ray;
     let mut accumulated_color = Vec3::new(1.0, 1.0, 1.0);
 
@@ -76,7 +76,19 @@ fn ray_color_loop(ray: Ray, hittable: &dyn Hittable, depth: u16, rng: &mut impl 
     accumulated_color
 }
 
-fn wave_scene() -> BvhNode {
+fn earth(center: Vec3, radius: f64) -> Rc<Sphere> {
+    let earth_texture = Rc::new(ImageTexture::from_path("data/longlat.png"));
+    let earth_mat = Rc::new(Lambertian {
+        albedo: earth_texture,
+    });
+    Rc::new(Sphere {
+        center,
+        radius,
+        material: earth_mat,
+    })
+}
+
+fn _wave_scene() -> BvhNode {
     let lambertian: Rc<dyn Material> = Rc::new(Lambertian {
         albedo: Rc::new(SolidColor::new(0.2, 0.4, 0.6)),
     });
@@ -150,7 +162,7 @@ fn book_cover_scene() -> BvhNode {
     let noise = Rc::new(MarbleNoise {
         perlin: Perlin::new(&mut rng),
         scale: 4.,
-        depth: 5
+        depth: 5,
     });
 
     let ground_mat = Rc::new(Lambertian { albedo: noise });
@@ -241,14 +253,7 @@ fn book_cover_scene() -> BvhNode {
         radius: -0.8,
         material: mat1,
     }));
-    let mat2: Rc<dyn Material> = Rc::new(Lambertian {
-        albedo: Rc::new(SolidColor::new(0.4, 0.2, 0.1)),
-    });
-    world_elements.push(Rc::new(Sphere {
-        center: big_sphere_pos_2,
-        radius: 1.0,
-        material: mat2,
-    }));
+    world_elements.push(earth(big_sphere_pos_2, 1.0));
     let mat3: Rc<dyn Material> = Rc::new(Metal {
         albedo: Rc::new(SolidColor::new(0.7, 0.6, 0.5)),
         roughness: 0.0,
