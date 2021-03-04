@@ -16,6 +16,7 @@ use rand::SeedableRng;
 use rand_distr::{Distribution, Uniform};
 use render::*;
 use std::rc::Rc;
+use std::time::Instant;
 use texture::*;
 use writers::*;
 
@@ -291,6 +292,8 @@ fn main() {
     write_header(render_width, render_height);
     let jitter_distribution = Uniform::from(0.0..1.0);
     let mut rng = SmallRng::seed_from_u64(0xDEADBEEF);
+
+    let before_render = Instant::now();
     for y in 0..render_height {
         if y % 100 == 0 {
             eprintln!("{} lines remaining", render_height - y);
@@ -309,4 +312,6 @@ fn main() {
             write_color(sum, num_iterations);
         }
     }
+    let time_spent = before_render.elapsed().as_secs();
+    eprintln!("Render took {:.2} seconds", time_spent);
 }
