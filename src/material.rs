@@ -7,6 +7,7 @@ use rand_distr::{Distribution, Uniform, UnitSphere};
 use std::rc::Rc;
 
 pub trait Material {
+    fn emitted(&self, u: f64, v: f64, p: &Vec3) -> Vec3;
     fn scatter(&self, ray: &Ray, rec: &HitRecord, rng: &mut dyn RngCore) -> Option<(Ray, Vec3)>;
 }
 
@@ -21,6 +22,10 @@ pub struct Metal {
 
 pub struct Dielectric {
     pub ior: f64,
+}
+
+pub struct DiffuseLight {
+    pub emissive: Rc<dyn Texture>,
 }
 
 impl Material for Lambertian {
@@ -43,6 +48,10 @@ impl Material for Lambertian {
             },
             self.albedo.value(rec.u, rec.v, &rec.p),
         ))
+    }
+
+    fn emitted(&self, _u: f64, _v: f64, _p: &Vec3) -> Vec3 {
+        Vec3::zeros()
     }
 }
 
@@ -78,6 +87,9 @@ impl Material for Metal {
         }
         None
     }
+    fn emitted(&self, _u: f64, _v: f64, _p: &Vec3) -> Vec3 {
+        Vec3::zeros()
+    }
 }
 
 impl Material for Dielectric {
@@ -112,6 +124,20 @@ impl Material for Dielectric {
             time: ray.time,
         };
         Some((scattered, attenuation))
+    }
+
+    fn emitted(&self, _u: f64, _v: f64, _p: &Vec3) -> Vec3 {
+        Vec3::zeros()
+    }
+}
+
+impl Material for DiffuseLight {
+    fn scatter(&self, ray: &Ray, rec: &HitRecord, rng: &mut dyn RngCore) -> Option<(Ray, Vec3)> {
+        None
+    }
+
+    fn emitted(&self, u: f64, v: f64, p: &Vec3) -> Vec3 {
+        self.emissive.value(u, v, p)
     }
 }
 

@@ -20,30 +20,42 @@ use std::time::Instant;
 use texture::*;
 use writers::*;
 
-fn ray_color(ray: Ray, hittable: &dyn Hittable, depth: u16, rng: &mut impl RngCore) -> Vec3 {
+fn _sky_gradient(dir: &Vec3) -> Vec3 {
+    let unit_dir = dir.normalize();
+    let t = 0.5 * (unit_dir.y + 1.0);
+    Vec3::new(1.0, 1.0, 1.0).lerp(&Vec3::new(0.5, 0.7, 1.0), t)
+}
+
+fn ray_color(
+    ray: Ray,
+    background: &Vec3,
+    hittable: &dyn Hittable,
+    depth: u16,
+    rng: &mut impl RngCore,
+) -> Vec3 {
     if depth == 0 {
         return Vec3::zeros();
     }
 
     if let Some(hit) = hittable.hit(&ray, 0.01, f64::INFINITY) {
+        let emitted = hit.material.emitted(hit.u, hit.v, &hit.p);
         return match hit.material.scatter(&ray, &hit, rng) {
             Some((outgoing_ray, attenuation)) => {
-                let color = ray_color(outgoing_ray, hittable, depth - 1, rng);
-                Vec3::new(
-                    color.x * attenuation.x,
-                    color.y * attenuation.y,
-                    color.z * attenuation.z,
-                )
+                let color = ray_color(outgoing_ray, background, hittable, depth - 1, rng);
+                emitted
+                    + Vec3::new(
+                        color.x * attenuation.x,
+                        color.y * attenuation.y,
+                        color.z * attenuation.z,
+                    )
             }
-            None => Vec3::zeros(),
+            None => emitted,
         };
     }
-
-    let unit_dir = ray.direction.normalize();
-    let t = 0.5 * (unit_dir.y + 1.0);
-    Vec3::new(1.0, 1.0, 1.0).lerp(&Vec3::new(0.5, 0.7, 1.0), t)
+    *background
 }
 
+// TODO Adapt to add the background and emitted.
 fn _ray_color_loop(ray: Ray, hittable: &dyn Hittable, depth: u16, rng: &mut impl RngCore) -> Vec3 {
     let mut current_ray = ray;
     let mut accumulated_color = Vec3::new(1.0, 1.0, 1.0);
@@ -173,9 +185,11 @@ fn book_cover_scene() -> BvhNode {
         material: ground_mat,
     }));
 
-    let material_distribution = Uniform::from(0..2);
+    let material_distribution = Uniform::from(0..4);
+
     let uniform_dist = Uniform::from(0.0..1.0);
     let metal_dist = Uniform::from(0.5..1.0);
+    let emissive_dist = Uniform::from(0.5..4.0);
     let metal_roughness_dist = Uniform::from(0.0..0.5);
     let position_dist = Uniform::from(-0.9..0.9);
     let glass_mat: Rc<dyn Material> = Rc::new(Dielectric { ior: 1.5 });
@@ -217,6 +231,12 @@ fn book_cover_scene() -> BvhNode {
                     })
                 }
                 2 => Rc::clone(&glass_mat),
+                3 => {
+                    let emissive = Rc::new(SolidColor {
+                        albedo: generate_vector(&emissive_dist, &mut rng),
+                    });
+                    Rc::new(DiffuseLight { emissive })
+                }
                 _ => panic!("Unreachable"),
             };
 
@@ -233,7 +253,7 @@ fn book_cover_scene() -> BvhNode {
                         material,
                     })
                 }
-                1 | 2 => Rc::new(Sphere {
+                1 | 2 | 3 => Rc::new(Sphere {
                     center,
                     radius: 0.2,
                     material,
@@ -265,15 +285,23 @@ fn book_cover_scene() -> BvhNode {
         material: mat3,
     }));
 
+    world_elements.push(Rc::new(Sphere {
+        center: Vec3::new(0.0, 10.0, 0.0),
+        radius: 2.0,
+        material: Rc::new(DiffuseLight {
+            emissive: Rc::new(SolidColor::new(5.0, 5.0, 5.0)),
+        }),
+    }));
+
     let mut rng = SmallRng::seed_from_u64(0xDEADBEEF);
     BvhNode::from_slice(&world_elements[..], 0.0, f64::INFINITY, &mut rng)
 }
 
 fn main() {
     let max_depth = 50;
-    let num_iterations = 10;
+    let num_iterations = 100;
     let aspect_ratio = 16.0 / 9.0;
-    let render_width = 800;
+    let render_width = 1920;
     let render_height = (render_width as f64 / aspect_ratio) as u32;
     let eye = Vec3::new(0.0, 2.0, -5.0);
     let target = Vec3::zeros();
@@ -307,7 +335,7 @@ fn main() {
                 let t = 1.0 - (jitter_y + (y as f64)) / (render_height as f64 - 1.0);
 
                 let ray = cam.get_ray(s, t, &mut rng);
-                sum += ray_color(ray, &world, max_depth, &mut rng);
+                sum += ray_color(ray, &Vec3::zeros(), &world, max_depth, &mut rng);
             }
             write_color(sum, num_iterations);
         }
