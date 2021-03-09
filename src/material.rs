@@ -4,18 +4,18 @@ use crate::{HitRecord, Ray};
 use nalgebra::Vector3;
 use rand::RngCore;
 use rand_distr::{Distribution, Uniform, UnitSphere};
-use std::rc::Rc;
+use std::sync::Arc;
 
-pub trait Material {
+pub trait Material: Sync + Send {
     fn scatter(&self, ray: &Ray, rec: &HitRecord, rng: &mut dyn RngCore) -> Option<(Ray, Vec3)>;
 }
 
 pub struct Lambertian {
-    pub albedo: Rc<dyn Texture>,
+    pub albedo: Arc<dyn Texture>,
 }
 
 pub struct Metal {
-    pub albedo: Rc<dyn Texture>,
+    pub albedo: Arc<dyn Texture>,
     pub roughness: f64,
 }
 

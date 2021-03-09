@@ -4,9 +4,9 @@ use crate::{HitRecord, Ray};
 use nalgebra::Vector3;
 use rand::RngCore;
 use rand_distr::{Distribution, Uniform};
-use std::rc::Rc;
+use std::sync::Arc;
 
-pub trait Hittable {
+pub trait Hittable : Sync + Send {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
     fn bounding_box(&self, t0: f64, t1: f64) -> Option<AABB>;
 }
@@ -14,7 +14,7 @@ pub trait Hittable {
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f64,
-    pub material: Rc<dyn Material>,
+    pub material: Arc<dyn Material>,
 }
 
 impl Sphere {
@@ -60,7 +60,7 @@ pub struct MovingSphere {
     pub time_begin: f64,
     pub time_end: f64,
     pub radius: f64,
-    pub material: Rc<dyn Material>,
+    pub material: Arc<dyn Material>,
 }
 
 impl MovingSphere {
@@ -100,14 +100,14 @@ impl Hittable for MovingSphere {
 }
 
 pub struct BvhNode {
-    left: Rc<dyn Hittable>,
-    right: Rc<dyn Hittable>,
+    left: Arc<dyn Hittable>,
+    right: Arc<dyn Hittable>,
     node_box: AABB,
 }
 
 impl BvhNode {
     pub fn from_slice(
-        data: &[Rc<dyn Hittable>],
+        data: &[Arc<dyn Hittable>],
         t0: f64,
         t1: f64,
         rng: &mut impl RngCore,
@@ -142,7 +142,7 @@ impl BvhNode {
             }
             _ => {
                 for hittable in data {
-                    let hittable = Rc::clone(&hittable);
+                    let hittable = Arc::clone(&hittable);
                     copy.push(hittable);
                 }
                 copy.sort_by(|left, right| {
@@ -166,8 +166,8 @@ impl BvhNode {
                     max: Vec3::zeros(),
                 });
                 BvhNode {
-                    left: Rc::new(left),
-                    right: Rc::new(right),
+                    left: Arc::new(left),
+                    right: Arc::new(right),
                     node_box: AABB::union(&box_left, &box_right),
                 }
             }
