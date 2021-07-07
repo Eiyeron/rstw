@@ -1,7 +1,9 @@
 use crate::math::Vec3;
+use crate::Hittable;
 use crate::Material;
 use rand::RngCore;
 use rand_distr::{Distribution, Uniform, UnitDisc};
+use std::sync::Arc;
 
 pub struct Ray {
     pub origin: Vec3,
@@ -77,6 +79,7 @@ impl<'a> HitRecord<'a> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Camera {
     pub origin: Vec3,
     pub horizontal: Vec3,
@@ -142,6 +145,92 @@ impl Camera {
                 - self.origin
                 - offset,
             time: shutter_time,
+        }
+    }
+}
+
+pub struct Subregion {
+    pub x: usize,
+    pub y: usize,
+    pub width: usize,
+    pub height: usize,
+}
+
+impl Subregion {
+    pub fn grid_cell(
+        x: usize,
+        y: usize,
+        cells_x: usize,
+        cells_y: usize,
+        render_width: usize,
+        render_height: usize,
+    ) -> Subregion {
+        let base_cell_width = render_width / cells_x;
+        let current_cell_width = {
+            if x == cells_x - 1 {
+                render_width - (base_cell_width * (cells_x - 1))
+            } else {
+                base_cell_width
+            }
+        };
+        let base_cell_height = render_height / cells_y;
+        let current_cell_height = {
+            if y == cells_y - 1 {
+                render_height - (base_cell_height * (cells_y - 1))
+            } else {
+                base_cell_height
+            }
+        };
+        Subregion {
+            x: base_cell_width * x,
+            y: base_cell_height * y,
+            width: current_cell_width,
+            height: current_cell_height,
+        }
+    }
+
+    pub fn slice_vertically(
+        y: usize,
+        cells_y: usize,
+        render_width: usize,
+        render_height: usize,
+    ) -> Subregion {
+        let base_cell_height = render_height / cells_y;
+        let current_cell_height = {
+            if y == cells_y - 1 {
+                render_height - (base_cell_height * (cells_y - 1))
+            } else {
+                base_cell_height
+            }
+        };
+        Subregion {
+            x: 0,
+            y: base_cell_height * y,
+            width: render_width,
+            height: current_cell_height,
+        }
+    }
+
+    pub fn area(&self) -> usize {
+        self.width * self.height
+    }
+}
+
+pub struct RenderTile {
+    pub region: Subregion,
+    pub buffer: Vec<Vec3>,
+    pub scene: Arc<dyn Hittable>,
+    pub camera: Camera,
+}
+
+impl RenderTile {
+    pub fn new(region: Subregion, scene: Arc<dyn Hittable>, camera: Camera) -> RenderTile {
+        let buffer_size = region.area();
+        RenderTile {
+            region,
+            buffer: vec![Vec3::zeros(); buffer_size],
+            scene,
+            camera,
         }
     }
 }

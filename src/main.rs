@@ -3,6 +3,7 @@ mod material;
 mod math;
 mod noise;
 mod render;
+mod scheduler;
 mod texture;
 mod writers;
 
@@ -15,6 +16,7 @@ use rand::RngCore;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Uniform};
 use render::*;
+use scheduler::Scheduler;
 use std::sync::Arc;
 use std::time::Instant;
 use texture::*;
@@ -151,7 +153,7 @@ fn book_cover_scene() -> BvhNode {
     let noise = Arc::new(MarbleNoise {
         perlin: Perlin::new(&mut rng),
         scale: 4.,
-        depth: 5
+        depth: 5,
     });
 
     let ground_mat = Arc::new(Lambertian { albedo: noise });
@@ -265,77 +267,41 @@ fn book_cover_scene() -> BvhNode {
 }
 
 fn main() {
-    let max_depth = 50;
+    let max_depth = 500;
     let num_threads = 8;
-    let num_iterations = 800/num_threads;
+    let num_iterations = 800;
     let aspect_ratio = 16.0 / 9.0;
     let render_width = 400;
-    let render_height = (render_width as f64 / aspect_ratio) as u32;
+    let render_height: usize = (render_width as f64 / aspect_ratio) as usize;
     let eye = Vec3::new(0.0, 2.0, -5.0);
     let target = Vec3::zeros();
-    // let cam = Camera::new(
-    //     eye,
-    //     target,
-    //     Vec3::new(0.0, 1.0, 0.0),
-    //     60.,
-    //     aspect_ratio,
-    //     0.0, // Aperture
-    //     (eye - target).norm(),
-    //     0.0,
-    //     1.0,
-    // );
     let world = Arc::new(book_cover_scene());
-    write_header(render_width, render_height);
-    // let mut rng = SmallRng::seed_from_u64(0xDEADBEEF);
-    let mut thread_handles= vec!();
     let before = Instant::now();
-    for tid in 0..num_threads {
-        let local_world = world.clone();
-        let seed = tid;
-        thread_handles.push(std::thread::spawn(move|| {
-            let jitter_distribution = Uniform::from(0.0..1.0);
-            let mut rng = SmallRng::seed_from_u64(seed);
-            let cam = Camera::new(
-                eye,
-                target,
-                Vec3::new(0.0, 1.0, 0.0),
-                60.,
-                aspect_ratio,
-                0.0, // Aperture
-                (eye - target).norm(),
-                0.0,
-                1.0,
-            );
+    // Camera derives Copy+Clone, the structure will be copied to the threads.
+    let cam = Camera::new(
+        eye,
+        target,
+        Vec3::new(0.0, 1.0, 0.0),
+        60.,
+        aspect_ratio,
+        0.0, // Aperture
+        (eye - target).norm(),
+        0.0,
+        1.0,
+    );
 
-            let mut buffer:Vec<Vec3> = vec!();
-            for y in 0..render_height {
-                for x in 0..render_width {
-                    let mut sum = Vec3::zeros();
-                    for _sample in 0..num_iterations {
-                        let jitter_x = jitter_distribution.sample(&mut rng);
-                        let jitter_y = jitter_distribution.sample(&mut rng);
-                        let s = (jitter_x + (x as f64)) / (render_width as f64 - 1.0);
-                        let t = 1.0 - (jitter_y + (y as f64)) / (render_height as f64 - 1.0);
-
-                        let ray = cam.get_ray(s, t, &mut rng);
-                        sum += ray_color(ray, local_world.as_ref(), max_depth, &mut rng);
-                    }
-                    buffer.push(sum);
-                }
-            }
-            buffer
-        }));
-    }
-    let mut final_buffer = vec![Vec3::zeros(); (render_height * render_width) as usize];
-    for tid in thread_handles {
-        if let Ok(thread_buffer) = tid.join() {
-            for (i,v) in thread_buffer.iter().enumerate() {
-                final_buffer[i as usize] += v;
-            }
-        }
-    }
+    let final_buffer = Scheduler::run_threaded(
+        &world,
+        &cam,
+        num_iterations,
+        num_threads,
+        render_width,
+        render_height as usize,
+        max_depth,
+    );
     eprintln!("Render took {} seconds", before.elapsed().as_secs());
+    write_header(render_width as u32, render_height as u32);
     for v in final_buffer {
-        write_color(v, (num_iterations * num_threads) as u32);
+        write_color(v, num_iterations as u32);
     }
 }
