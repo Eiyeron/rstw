@@ -4,12 +4,24 @@ use rand::RngCore;
 
 pub type Vec3 = nalgebra::Vector3<f64>;
 
+#[derive(Clone)]
 pub struct AABB {
     pub min: Vec3,
     pub max: Vec3,
 }
 
 impl AABB {
+    pub fn new(min: Vec3, max: Vec3) -> AABB {
+        AABB { min, max }
+    }
+
+    pub fn zeros() -> AABB {
+        AABB {
+            min: Vec3::zeros(),
+            max: Vec3::zeros(),
+        }
+    }
+
     pub fn union(&self, other: &AABB) -> AABB {
         let min = Vec3::new(
             f64::min(self.min.x, other.min.x),

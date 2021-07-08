@@ -308,9 +308,9 @@ fn book_cover_scene() -> BvhNode {
 }
 
 fn main() {
-    let max_depth = 500;
+    let max_depth = 100;
     let num_threads = 8;
-    let num_iterations = 800;
+    let num_iterations = 100;
     let aspect_ratio = 16.0 / 9.0;
     let render_width = 400;
     let render_height: usize = (render_width as f64 / aspect_ratio) as usize;

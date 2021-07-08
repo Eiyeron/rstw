@@ -6,7 +6,9 @@ use rand::RngCore;
 use rand_distr::{Distribution, Uniform};
 use std::sync::Arc;
 
-pub trait Hittable : Sync + Send {
+use std::f64::consts::{PI, TAU};
+
+pub trait Hittable: Sync + Send {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
     fn bounding_box(&self, t0: f64, t1: f64) -> Option<AABB>;
 }
@@ -22,7 +24,7 @@ impl Sphere {
         let theta = (-p.y).acos();
         let phi = f64::atan2(-p.z, p.x) + std::f64::consts::PI;
 
-        (phi / std::f64::consts::TAU, theta / std::f64::consts::PI)
+        (phi / TAU, theta / PI)
     }
 }
 
@@ -47,10 +49,10 @@ impl Hittable for Sphere {
 
     fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
         let radius_vector = Vector3::from_element(self.radius);
-        Some(AABB {
-            min: self.center - radius_vector,
-            max: self.center + radius_vector,
-        })
+        Some(AABB::new(
+            self.center - radius_vector,
+            self.center + radius_vector,
+        ))
     }
 }
 
@@ -87,14 +89,14 @@ impl Hittable for MovingSphere {
 
     fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
         let radius_vector = Vec3::from_element(self.radius);
-        let box_at_begin = AABB {
-            min: self.center_begin - radius_vector,
-            max: self.center_begin + radius_vector,
-        };
-        let box_at_end = AABB {
-            min: self.center_end - radius_vector,
-            max: self.center_end + radius_vector,
-        };
+        let box_at_begin = AABB::new(
+            self.center_begin - radius_vector,
+            self.center_begin + radius_vector,
+        );
+        let box_at_end = AABB::new(
+            self.center_end - radius_vector,
+            self.center_end + radius_vector,
+        );
         Some(AABB::union(&box_at_begin, &box_at_end))
     }
 }
@@ -118,22 +120,16 @@ impl BvhNode {
             1 => BvhNode {
                 left: data[0].clone(),
                 right: data[0].clone(),
-                node_box: data[0].as_ref().bounding_box(t0, t1).unwrap_or(AABB {
-                    min: Vec3::zeros(),
-                    max: Vec3::zeros(),
-                }),
+                node_box: data[0]
+                    .as_ref()
+                    .bounding_box(t0, t1)
+                    .unwrap_or(AABB::zeros()),
             },
             2 => {
                 let left = data[0].as_ref();
                 let right = data[1].as_ref();
-                let box_left = left.bounding_box(t0, t1).unwrap_or(AABB {
-                    min: Vec3::zeros(),
-                    max: Vec3::zeros(),
-                });
-                let box_right = right.bounding_box(t0, t1).unwrap_or(AABB {
-                    min: Vec3::zeros(),
-                    max: Vec3::zeros(),
-                });
+                let box_left = left.bounding_box(t0, t1).unwrap_or(AABB::zeros());
+                let box_right = right.bounding_box(t0, t1).unwrap_or(AABB::zeros());
                 BvhNode {
                     left: data[0].clone(),
                     right: data[1].clone(),
@@ -157,14 +153,8 @@ impl BvhNode {
 
                 let left = BvhNode::from_slice(left, t0, t1, rng);
                 let right = BvhNode::from_slice(right, t0, t1, rng);
-                let box_left = left.bounding_box(t0, t1).unwrap_or(AABB {
-                    min: Vec3::zeros(),
-                    max: Vec3::zeros(),
-                });
-                let box_right = right.bounding_box(t0, t1).unwrap_or(AABB {
-                    min: Vec3::zeros(),
-                    max: Vec3::zeros(),
-                });
+                let box_left = left.bounding_box(t0, t1).unwrap_or(AABB::zeros());
+                let box_right = right.bounding_box(t0, t1).unwrap_or(AABB::zeros());
                 BvhNode {
                     left: Arc::new(left),
                     right: Arc::new(right),
@@ -181,14 +171,8 @@ impl BvhNode {
             eprintln!("No bbox in BvhNode constructor");
         }
 
-        let box_a = box_a.unwrap_or(AABB {
-            min: Vector3::zeros(),
-            max: Vector3::zeros(),
-        });
-        let box_b = box_b.unwrap_or(AABB {
-            min: Vector3::zeros(),
-            max: Vector3::zeros(),
-        });
+        let box_a = box_a.unwrap_or(AABB::zeros());
+        let box_b = box_b.unwrap_or(AABB::zeros());
         match axis {
             0 => box_a.min.x.partial_cmp(&box_b.min.x).unwrap(),
             1 => box_a.min.y.partial_cmp(&box_b.min.y).unwrap(),
@@ -214,10 +198,7 @@ impl Hittable for BvhNode {
     }
 
     fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
-        Some(AABB {
-            min: self.node_box.min,
-            max: self.node_box.max,
-        })
+        Some(self.node_box.clone())
     }
 }
 

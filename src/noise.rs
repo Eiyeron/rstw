@@ -13,14 +13,6 @@ pub struct Perlin {
 }
 
 impl Perlin {
-    fn generate_permutations(rng: &mut impl RngCore) -> [usize; POINT_COUNT] {
-        let mut base = [0; POINT_COUNT];
-        for i in 0..base.len() {
-            base[i] = i;
-        }
-        base.shuffle(rng);
-        base
-    }
     pub fn new(rng: &mut impl RngCore) -> Perlin {
         let mut random_vectors: [Vec3; POINT_COUNT] = [Vec3::zeros(); POINT_COUNT];
         for v in random_vectors.iter_mut() {
@@ -33,6 +25,15 @@ impl Perlin {
             permutations_y: Perlin::generate_permutations(rng),
             permutations_z: Perlin::generate_permutations(rng),
         }
+    }
+
+    fn generate_permutations(rng: &mut impl RngCore) -> [usize; POINT_COUNT] {
+        let mut base = [0; POINT_COUNT];
+        for i in 0..base.len() {
+            base[i] = i;
+        }
+        base.shuffle(rng);
+        base
     }
 
     fn _uninterpolated_noise(&self, p: &Vec3) -> f64 {
