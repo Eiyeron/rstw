@@ -3,6 +3,7 @@ mod material;
 mod math;
 mod noise;
 mod render;
+mod scheduler;
 mod texture;
 mod writers;
 
@@ -15,7 +16,8 @@ use rand::RngCore;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Uniform};
 use render::*;
-use std::rc::Rc;
+use scheduler::Scheduler;
+use std::sync::Arc;
 use std::time::Instant;
 use texture::*;
 use writers::*;
@@ -89,12 +91,12 @@ fn _ray_color_loop(ray: Ray, hittable: &dyn Hittable, depth: u16, rng: &mut impl
     accumulated_color
 }
 
-fn earth(center: Vec3, radius: f64) -> Rc<Sphere> {
-    let earth_texture = Rc::new(ImageTexture::from_path("data/longlat.png"));
-    let earth_mat = Rc::new(Lambertian {
+fn earth(center: Vec3, radius: f64) -> Arc<Sphere> {
+    let earth_texture = Arc::new(ImageTexture::from_path("data/longlat.png"));
+    let earth_mat = Arc::new(Lambertian {
         albedo: earth_texture,
     });
-    Rc::new(Sphere {
+    Arc::new(Sphere {
         center,
         radius,
         material: earth_mat,
@@ -102,26 +104,26 @@ fn earth(center: Vec3, radius: f64) -> Rc<Sphere> {
 }
 
 fn _wave_scene() -> BvhNode {
-    let lambertian: Rc<dyn Material> = Rc::new(Lambertian {
-        albedo: Rc::new(SolidColor::new(0.2, 0.4, 0.6)),
+    let lambertian: Arc<dyn Material> = Arc::new(Lambertian {
+        albedo: Arc::new(SolidColor::new(0.2, 0.4, 0.6)),
     });
 
-    let checker = Rc::new(Checkerboard {
-        albedo_odd: Rc::new(SolidColor::new(0.2, 0.4, 0.6)),
-        albedo_even: Rc::new(SolidColor::new(0.6, 0.6, 0.2)),
+    let checker = Arc::new(Checkerboard {
+        albedo_odd: Arc::new(SolidColor::new(0.2, 0.4, 0.6)),
+        albedo_even: Arc::new(SolidColor::new(0.6, 0.6, 0.2)),
     });
 
-    let lambertian_2: Rc<dyn Material> = Rc::new(Lambertian { albedo: checker });
-    let metal: Rc<dyn Material> = Rc::new(Metal {
-        albedo: Rc::new(SolidColor::new(0.7, 0.6, 0.5)),
+    let lambertian_2: Arc<dyn Material> = Arc::new(Lambertian { albedo: checker });
+    let metal: Arc<dyn Material> = Arc::new(Metal {
+        albedo: Arc::new(SolidColor::new(0.7, 0.6, 0.5)),
         roughness: 0.0,
     });
-    let glass: Rc<dyn Material> = Rc::new(Dielectric { ior: 1.5 });
+    let glass: Arc<dyn Material> = Arc::new(Dielectric { ior: 1.5 });
 
     // No need for a hittable_list. A simple vector is largely enough for the process.
     // A scene load/save could be interesting to add.
-    let mut objects: Vec<Rc<dyn Hittable>> = Vec::new();
-    objects.push(Rc::new(Sphere {
+    let mut objects: Vec<Arc<dyn Hittable>> = Vec::new();
+    objects.push(Arc::new(Sphere {
         center: Vec3::new(0.0, -1005.0, 0.0),
         radius: 1000.0,
         material: lambertian_2,
@@ -130,7 +132,7 @@ fn _wave_scene() -> BvhNode {
         for x in -10..10 {
             let r = f64::hypot(x as f64, y as f64);
             let begin = Vec3::new((x * 3) as f64, 0.0, (y * 3) as f64);
-            objects.push(Rc::new(MovingSphere {
+            objects.push(Arc::new(MovingSphere {
                 center_begin: begin,
                 center_end: begin + Vec3::new(0.0, 1.0, 0.0),
                 radius: r / 5. + 0.2,
@@ -139,7 +141,7 @@ fn _wave_scene() -> BvhNode {
                 time_end: 1.0,
             }));
             let begin = Vec3::new((x * 3) as f64, 0.0, (y * 3 + 3) as f64);
-            objects.push(Rc::new(MovingSphere {
+            objects.push(Arc::new(MovingSphere {
                 center_begin: begin,
                 center_end: begin + Vec3::new(0.0, 1.0, 0.0),
                 radius: r / 5. + 0.2,
@@ -148,7 +150,7 @@ fn _wave_scene() -> BvhNode {
                 time_end: 1.0,
             }));
             let begin = Vec3::new((x * 3) as f64, 0.0, (y * 3 + 6) as f64);
-            objects.push(Rc::new(MovingSphere {
+            objects.push(Arc::new(MovingSphere {
                 center_begin: begin,
                 center_end: begin + Vec3::new(0.0, 1.0, 0.0),
                 radius: r / 5. + 0.2,
@@ -164,22 +166,22 @@ fn _wave_scene() -> BvhNode {
 }
 
 fn book_cover_scene() -> BvhNode {
-    let mut world_elements: Vec<Rc<dyn Hittable>> = vec![];
+    let mut world_elements: Vec<Arc<dyn Hittable>> = vec![];
     let mut rng = SmallRng::seed_from_u64(0xDEADBEEF);
 
-    let _checker = Rc::new(Checkerboard {
-        albedo_odd: Rc::new(SolidColor::new(0.2, 0.4, 0.6)),
-        albedo_even: Rc::new(SolidColor::new(0.6, 0.6, 0.2)),
+    let _checker = Arc::new(Checkerboard {
+        albedo_odd: Arc::new(SolidColor::new(0.2, 0.4, 0.6)),
+        albedo_even: Arc::new(SolidColor::new(0.6, 0.6, 0.2)),
     });
 
-    let noise = Rc::new(MarbleNoise {
+    let noise = Arc::new(MarbleNoise {
         perlin: Perlin::new(&mut rng),
         scale: 4.,
         depth: 5,
     });
 
-    let ground_mat = Rc::new(Lambertian { albedo: noise });
-    world_elements.push(Rc::new(Sphere {
+    let ground_mat = Arc::new(Lambertian { albedo: noise });
+    world_elements.push(Arc::new(Sphere {
         center: Vec3::new(0.0, -1000.0, 0.0),
         radius: 1000.0,
         material: ground_mat,
@@ -192,7 +194,7 @@ fn book_cover_scene() -> BvhNode {
     let emissive_dist = Uniform::from(0.5..4.0);
     let metal_roughness_dist = Uniform::from(0.0..0.5);
     let position_dist = Uniform::from(-0.9..0.9);
-    let glass_mat: Rc<dyn Material> = Rc::new(Dielectric { ior: 1.5 });
+    let glass_mat: Arc<dyn Material> = Arc::new(Dielectric { ior: 1.5 });
 
     let big_sphere_pos_1 = Vec3::new(0.0, 1.0, 0.0);
     let big_sphere_pos_2 = Vec3::new(-4.0, 1.0, 0.0);
@@ -214,28 +216,28 @@ fn book_cover_scene() -> BvhNode {
                 continue;
             }
             let selector = material_distribution.sample(&mut rng);
-            let material: Rc<dyn Material> = match selector {
+            let material: Arc<dyn Material> = match selector {
                 0 => {
                     let a1 = generate_vector(&uniform_dist, &mut rng);
                     let a2 = generate_vector(&uniform_dist, &mut rng);
-                    let albedo = Rc::new(SolidColor::new(a1.x * a2.x, a1.y * a2.y, a1.z * a2.z));
-                    Rc::new(Lambertian { albedo })
+                    let albedo = Arc::new(SolidColor::new(a1.x * a2.x, a1.y * a2.y, a1.z * a2.z));
+                    Arc::new(Lambertian { albedo })
                 }
                 1 => {
-                    let albedo = Rc::new(SolidColor {
+                    let albedo = Arc::new(SolidColor {
                         albedo: generate_vector(&metal_dist, &mut rng),
                     });
-                    Rc::new(Metal {
+                    Arc::new(Metal {
                         albedo,
                         roughness: metal_roughness_dist.sample(&mut rng),
                     })
                 }
-                2 => Rc::clone(&glass_mat),
+                2 => Arc::clone(&glass_mat),
                 3 => {
-                    let emissive = Rc::new(SolidColor {
+                    let emissive = Arc::new(SolidColor {
                         albedo: generate_vector(&emissive_dist, &mut rng),
                     });
-                    Rc::new(DiffuseLight { emissive })
+                    Arc::new(DiffuseLight { emissive })
                 }
                 _ => panic!("Unreachable"),
             };
@@ -244,7 +246,7 @@ fn book_cover_scene() -> BvhNode {
                 0 => {
                     let center_2 =
                         center + Vec3::new(0.0, metal_roughness_dist.sample(&mut rng), 0.0);
-                    Rc::new(MovingSphere {
+                    Arc::new(MovingSphere {
                         center_begin: center,
                         center_end: center_2,
                         time_begin: 0.0,
@@ -253,7 +255,7 @@ fn book_cover_scene() -> BvhNode {
                         material,
                     })
                 }
-                1 | 2 | 3 => Rc::new(Sphere {
+                1 | 2 | 3 => Arc::new(Sphere {
                     center,
                     radius: 0.2,
                     material,
@@ -263,33 +265,41 @@ fn book_cover_scene() -> BvhNode {
         }
     }
 
-    let mat1: Rc<dyn Material> = Rc::new(Dielectric { ior: 1.5 });
-    world_elements.push(Rc::new(Sphere {
+    let mat1: Arc<dyn Material> = Arc::new(Dielectric { ior: 1.5 });
+    world_elements.push(Arc::new(Sphere {
         center: big_sphere_pos_1,
         radius: 1.0,
-        material: Rc::clone(&mat1),
+        material: Arc::clone(&mat1),
     }));
-    world_elements.push(Rc::new(Sphere {
+    world_elements.push(Arc::new(Sphere {
         center: big_sphere_pos_1,
         radius: -0.8,
         material: mat1,
     }));
     world_elements.push(earth(big_sphere_pos_2, 1.0));
-    let mat3: Rc<dyn Material> = Rc::new(Metal {
-        albedo: Rc::new(SolidColor::new(0.7, 0.6, 0.5)),
+    let mat2: Arc<dyn Material> = Arc::new(Lambertian {
+        albedo: Arc::new(SolidColor::new(0.4, 0.2, 0.1)),
+    });
+    world_elements.push(Arc::new(Sphere {
+        center: big_sphere_pos_2,
+        radius: 1.0,
+        material: mat2,
+    }));
+    let mat3: Arc<dyn Material> = Arc::new(Metal {
+        albedo: Arc::new(SolidColor::new(0.7, 0.6, 0.5)),
         roughness: 0.0,
     });
-    world_elements.push(Rc::new(Sphere {
+    world_elements.push(Arc::new(Sphere {
         center: big_sphere_pos_3,
         radius: 1.0,
         material: mat3,
     }));
 
-    world_elements.push(Rc::new(Sphere {
+    world_elements.push(Arc::new(Sphere {
         center: Vec3::new(0.0, 10.0, 0.0),
         radius: 2.0,
-        material: Rc::new(DiffuseLight {
-            emissive: Rc::new(SolidColor::new(5.0, 5.0, 5.0)),
+        material: Arc::new(DiffuseLight {
+            emissive: Arc::new(SolidColor::new(5.0, 5.0, 5.0)),
         }),
     }));
 
@@ -298,13 +308,17 @@ fn book_cover_scene() -> BvhNode {
 }
 
 fn main() {
-    let max_depth = 50;
-    let num_iterations = 100;
+    let max_depth = 500;
+    let num_threads = 8;
+    let num_iterations = 800;
     let aspect_ratio = 16.0 / 9.0;
-    let render_width = 1920;
-    let render_height = (render_width as f64 / aspect_ratio) as u32;
+    let render_width = 400;
+    let render_height: usize = (render_width as f64 / aspect_ratio) as usize;
     let eye = Vec3::new(0.0, 2.0, -5.0);
     let target = Vec3::zeros();
+    let world = Arc::new(book_cover_scene());
+    let before = Instant::now();
+    // Camera derives Copy+Clone, the structure will be copied to the threads.
     let cam = Camera::new(
         eye,
         target,
@@ -316,30 +330,19 @@ fn main() {
         0.0,
         1.0,
     );
-    let world = book_cover_scene();
-    write_header(render_width, render_height);
-    let jitter_distribution = Uniform::from(0.0..1.0);
-    let mut rng = SmallRng::seed_from_u64(0xDEADBEEF);
 
-    let before_render = Instant::now();
-    for y in 0..render_height {
-        if y % 100 == 0 {
-            eprintln!("{} lines remaining", render_height - y);
-        }
-        for x in 0..render_width {
-            let mut sum = Vec3::zeros();
-            for _sample in 0..num_iterations {
-                let jitter_x = jitter_distribution.sample(&mut rng);
-                let jitter_y = jitter_distribution.sample(&mut rng);
-                let s = (jitter_x + (x as f64)) / (render_width as f64 - 1.0);
-                let t = 1.0 - (jitter_y + (y as f64)) / (render_height as f64 - 1.0);
-
-                let ray = cam.get_ray(s, t, &mut rng);
-                sum += ray_color(ray, &Vec3::zeros(), &world, max_depth, &mut rng);
-            }
-            write_color(sum, num_iterations);
-        }
+    let final_buffer = Scheduler::run_threaded(
+        &world,
+        &cam,
+        num_iterations,
+        num_threads,
+        render_width,
+        render_height as usize,
+        max_depth,
+    );
+    eprintln!("Render took {} seconds", before.elapsed().as_secs());
+    write_header(render_width as u32, render_height as u32);
+    for v in final_buffer {
+        write_color(v, num_iterations as u32);
     }
-    let time_spent = before_render.elapsed().as_secs();
-    eprintln!("Render took {:.2} seconds", time_spent);
 }

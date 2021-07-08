@@ -42,7 +42,8 @@ impl Perlin {
         let iz = ((p.z as i64) as usize) % POINT_COUNT;
 
         self.random_vectors
-            [self.permutations_x[ix] ^ self.permutations_y[iy] ^ self.permutations_z[iz]].x
+            [self.permutations_x[ix] ^ self.permutations_y[iy] ^ self.permutations_z[iz]]
+            .x
     }
 
     fn perlin_interpolation(c: [[[Vec3; 2]; 2]; 2], u: f64, v: f64, w: f64) -> f64 {
@@ -58,9 +59,9 @@ impl Perlin {
                     let fj = j as f64;
                     let fk = k as f64;
                     let weight_v = Vec3::new(u - fi, v - fj, w - fk);
-                    acc += (fi * uu + (1.0 - fi)*(1.0 - uu))
-                        * (fj * vv + (1.0 - fj)*(1.0 - vv))
-                        * (fk * ww + (1.0 - fk)*(1.0 - ww))
+                    acc += (fi * uu + (1.0 - fi) * (1.0 - uu))
+                        * (fj * vv + (1.0 - fj) * (1.0 - vv))
+                        * (fk * ww + (1.0 - fk) * (1.0 - ww))
                         * c[i][j][k].dot(&weight_v)
                 }
             }
@@ -84,9 +85,9 @@ impl Perlin {
             for dj in 0..2 {
                 for dk in 0..2 {
                     let (x, y, z) = (
-                        (i + di) as usize % POINT_COUNT,
-                        (j + dj) as usize % POINT_COUNT,
-                        (k + dk) as usize % POINT_COUNT,
+                        i.wrapping_add(di) as usize % POINT_COUNT,
+                        j.wrapping_add(dj) as usize % POINT_COUNT,
+                        k.wrapping_add(dk) as usize % POINT_COUNT,
                     );
                     // TODO range variables into usize
                     vals[di as usize][dj as usize][dk as usize] = self.random_vectors

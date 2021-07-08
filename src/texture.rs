@@ -3,9 +3,9 @@ use crate::Vec3;
 
 use image::RgbImage;
 
-use std::rc::Rc;
+use std::sync::Arc;
 
-pub trait Texture {
+pub trait Texture: Sync + Send {
     fn value(&self, u: f64, v: f64, p: &Vec3) -> Vec3;
 }
 
@@ -13,10 +13,10 @@ pub struct SolidColor {
     pub albedo: Vec3,
 }
 
-// TODO I'm getting tired of having Rc everywhere.
+// TODO I'm getting tired of having Arc everywhere.
 pub struct Checkerboard {
-    pub albedo_odd: Rc<dyn Texture>,
-    pub albedo_even: Rc<dyn Texture>,
+    pub albedo_odd: Arc<dyn Texture>,
+    pub albedo_even: Arc<dyn Texture>,
 }
 
 pub struct Noise {
@@ -128,6 +128,7 @@ fn pertubation(perlin: &Perlin, depth: u32, p: &Vec3) -> f64 {
     let mut acc = 0.0;
     let mut scaled = *p;
     let mut weight = 1.0;
+
     for _i in 0..depth {
         acc += perlin.noise(&scaled) * weight;
         weight /= 2.0;
