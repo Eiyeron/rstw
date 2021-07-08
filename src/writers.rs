@@ -1,11 +1,12 @@
 // TODO trait?
 use crate::math::Vec3;
+use std::io::Write;
 
-pub fn write_header(width: u32, height: u32) {
-    println!("P3 {} {}\n255", width, height);
+pub fn write_header(out: &mut dyn Write, width: u32, height: u32) {
+    writeln!(out, "P3 {} {}\n255", width, height);
 }
 
-pub fn write_color(color: Vec3, num_samples: u32) {
+pub fn write_color(out: &mut dyn Write, color: Vec3, num_samples: u32) {
     let average = color / (num_samples as f64);
 
     let srgb = Vec3::new(
@@ -20,5 +21,5 @@ pub fn write_color(color: Vec3, num_samples: u32) {
         (srgb.z * 255.999) as u8,
     );
 
-    println!("{} {} {}", pixel_r, pixel_g, pixel_b);
+    writeln!(out, "{} {} {}", pixel_r, pixel_g, pixel_b);
 }

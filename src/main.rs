@@ -1,3 +1,4 @@
+mod args;
 mod hittable;
 mod material;
 mod math;
@@ -8,6 +9,7 @@ mod texture;
 mod writers;
 
 use crate::noise::Perlin;
+use args::TracerArgs;
 use hittable::*;
 use material::*;
 use math::*;
@@ -17,6 +19,9 @@ use rand::SeedableRng;
 use rand_distr::{Distribution, Uniform};
 use render::*;
 use scheduler::Scheduler;
+use std::fs::File;
+use std::io::stdout;
+use std::io::Write;
 use std::sync::Arc;
 use std::time::Instant;
 use texture::*;
@@ -308,12 +313,18 @@ fn book_cover_scene() -> BvhNode {
 }
 
 fn main() {
-    let max_depth = 100;
-    let num_threads = 8;
-    let num_iterations = 100;
-    let aspect_ratio = 16.0 / 9.0;
-    let render_width = 400;
-    let render_height: usize = (render_width as f64 / aspect_ratio) as usize;
+    let args_maybe = TracerArgs::from_std();
+    if let None = args_maybe {
+        return;
+    }
+    let arguments = args_maybe.unwrap();
+
+    let max_depth = arguments.depth;
+    let num_threads = arguments.num_threads;
+    let num_iterations = arguments.samples;
+    let render_width = arguments.width;
+    let render_height: usize = arguments.height;
+    let aspect_ratio = render_width as f64 / render_height as f64;
     let eye = Vec3::new(0.0, 2.0, -5.0);
     let target = Vec3::zeros();
     let world = Arc::new(book_cover_scene());
@@ -340,9 +351,19 @@ fn main() {
         render_height as usize,
         max_depth,
     );
+
+    let mut output_file: Box<dyn Write> = match arguments.output_path {
+        Some(path) => Box::new(File::create(path).unwrap()),
+        None => Box::new(stdout()),
+    };
+
     eprintln!("Render took {} seconds", before.elapsed().as_secs());
-    write_header(render_width as u32, render_height as u32);
+    write_header(
+        output_file.as_mut(),
+        render_width as u32,
+        render_height as u32,
+    );
     for v in final_buffer {
-        write_color(v, num_iterations as u32);
+        write_color(output_file.as_mut(), v, num_iterations as u32);
     }
 }
