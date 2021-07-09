@@ -314,7 +314,7 @@ fn main() {
     let num_threads = arguments.num_threads;
     let num_iterations = arguments.samples;
     let render_width = arguments.width;
-    let render_height: usize = arguments.height;
+    let render_height = arguments.height;
     let aspect_ratio = render_width as f64 / render_height as f64;
     let eye = Vec3::new(0.0, 2.0, -5.0);
     let target = Vec3::zeros();
@@ -339,9 +339,11 @@ fn main() {
         num_iterations,
         num_threads,
         render_width,
-        render_height as usize,
+        render_height,
         max_depth,
     );
+
+    eprintln!("Render took {} seconds", before.elapsed().as_secs());
 
     let mut output_file: Box<dyn Write> = match &arguments.output_path {
         None => Box::new(stdout()),
@@ -354,8 +356,6 @@ fn main() {
             }
         }
     };
-
-    eprintln!("Render took {} seconds", before.elapsed().as_secs());
 
     let extension = arguments.output_path.unwrap_or_default();
     let path = Path::new(&extension);

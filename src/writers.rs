@@ -25,7 +25,7 @@ impl PPMWriter {
     pub fn write_color(out: &mut dyn Write, color: &Vec3, num_samples: u32) {
         let average = color / (num_samples as f64);
 
-        let srgb = colors::linear_to_bt709(&average);
+        let srgb = colors::linear_to_srgb(&average);
         let (r, g, b) = colors::downscale_to_8bit(&srgb);
 
         writeln!(out, "{} {} {}", r, g, b).unwrap();

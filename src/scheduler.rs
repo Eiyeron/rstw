@@ -33,23 +33,29 @@ impl Scheduler {
             let jitter_distribution = Uniform::from(0.0..1.0);
             let mut rng = SmallRng::seed_from_u64(tid as u64);
 
-            let width_minus_one = render_width as f64 - 1.0;
-            let height_minus_one = render_height as f64 - 1.0;
+            let width_minus_one = (render_width - 1) as f64;
+            let height_minus_one = (render_height - 1) as f64;
 
             for y in 0..worker.region.height {
                 let tile_y_offset = y * worker.region.width;
-                let final_y_offset = (y + worker.region.y) as f64;
+                let uv_y_offset = (y + worker.region.y) as f64;
 
                 for x in 0..worker.region.width {
                     let mut sum = Vec3::zeros();
-                    let final_x_offset = (x + worker.region.x) as f64;
+                    let uv_x_offset = (x + worker.region.x) as f64;
 
                     for _sample in 0..num_iterations {
+                        // Jittering on the whole pixel's domain.
+                        // 0    1
+                        //  ┌───┐
+                        //  │   │
+                        // 1└───┘
+                        // No need to use an unit disc.
                         let jitter_x = jitter_distribution.sample(&mut rng);
                         let jitter_y = jitter_distribution.sample(&mut rng);
 
-                        let s = (jitter_x + final_x_offset) / width_minus_one;
-                        let t = 1.0 - (jitter_y + final_y_offset) / height_minus_one;
+                        let s = (jitter_x + uv_x_offset) / width_minus_one;
+                        let t = 1.0 - (jitter_y + uv_y_offset) / height_minus_one;
 
                         let ray = worker.camera.get_ray(s, t, &mut rng);
                         sum += ray_color(
