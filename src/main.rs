@@ -1,4 +1,5 @@
 mod args;
+mod colors;
 mod hittable;
 mod material;
 mod math;
@@ -22,6 +23,7 @@ use scheduler::Scheduler;
 use std::fs::File;
 use std::io::stdout;
 use std::io::Write;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 use texture::*;
@@ -49,12 +51,7 @@ fn ray_color(
         return match hit.material.scatter(&ray, &hit, rng) {
             Some((outgoing_ray, attenuation)) => {
                 let color = ray_color(outgoing_ray, background, hittable, depth - 1, rng);
-                emitted
-                    + Vec3::new(
-                        color.x * attenuation.x,
-                        color.y * attenuation.y,
-                        color.z * attenuation.z,
-                    )
+                emitted + color.component_mul(&attenuation)
             }
             None => emitted,
         };
@@ -71,9 +68,7 @@ fn _ray_color_loop(ray: Ray, hittable: &dyn Hittable, depth: u16, rng: &mut impl
         if let Some(hit) = hittable.hit(&current_ray, 0.01, f64::INFINITY) {
             match hit.material.scatter(&current_ray, &hit, rng) {
                 Some((outgoing_ray, attenuation)) => {
-                    accumulated_color.x *= attenuation.x;
-                    accumulated_color.y *= attenuation.y;
-                    accumulated_color.z *= attenuation.z;
+                    accumulated_color = accumulated_color.component_mul(&attenuation);
                     current_ray = outgoing_ray;
                 }
                 // Ray was absorbed, stop.
@@ -85,11 +80,7 @@ fn _ray_color_loop(ray: Ray, hittable: &dyn Hittable, depth: u16, rng: &mut impl
             let unit_dir = current_ray.direction.normalize();
             let t = 0.5 * (unit_dir.y + 1.0);
             let sky_ray = Vec3::new(1.0, 1.0, 1.0).lerp(&Vec3::new(0.5, 0.7, 1.0), t);
-            return Vec3::new(
-                accumulated_color.x * sky_ray.x,
-                accumulated_color.y * sky_ray.y,
-                accumulated_color.z * sky_ray.z,
-            );
+            return accumulated_color.component_mul(&sky_ray);
         }
     }
 
@@ -352,18 +343,36 @@ fn main() {
         max_depth,
     );
 
-    let mut output_file: Box<dyn Write> = match arguments.output_path {
-        Some(path) => Box::new(File::create(path).unwrap()),
+    let mut output_file: Box<dyn Write> = match &arguments.output_path {
         None => Box::new(stdout()),
+        Some(path) => {
+            // Usual convention is that - uses stdout
+            if path == "-" {
+                Box::new(stdout())
+            } else {
+                Box::new(File::create(path).unwrap())
+            }
+        }
     };
 
     eprintln!("Render took {} seconds", before.elapsed().as_secs());
-    write_header(
-        output_file.as_mut(),
-        render_width as u32,
-        render_height as u32,
-    );
-    for v in final_buffer {
-        write_color(output_file.as_mut(), v, num_iterations as u32);
+
+    let extension = arguments.output_path.unwrap_or_default();
+    let path = Path::new(&extension);
+    if let Some(boxed_writer) = guess_output_format(
+        &path
+            .extension()
+            .unwrap_or_default()
+            .to_str()
+            .unwrap_or_default(),
+    ) {
+        boxed_writer.write_to(
+            output_file.as_mut(),
+            &final_buffer,
+            render_width,
+            render_height,
+            // Sigh, see ImageWriter's todo
+            num_iterations as u32,
+        );
     }
 }
