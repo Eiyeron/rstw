@@ -389,21 +389,39 @@ fn cornell_box() -> BvhNode {
         k: 554.,
         material: light.clone(),
     }));
-    objects.push(Arc::new(Sphere {
-        center: Vec3::new(139., 60., 284.),
-        radius: 60.,
-        material: metal_02.clone(),
-    }));
-    objects.push(Arc::new(Sphere {
-        center: Vec3::new(278., 60., 284.),
-        radius: 60.,
-        material: metal_05.clone(),
-    }));
-    objects.push(Arc::new(Sphere {
-        center: Vec3::new(417., 60., 284.),
-        radius: 60.,
-        material: metal_08.clone(),
-    }));
+    // Spheres
+    // objects.push(Arc::new(Sphere {
+    //     center: Vec3::new(139., 60., 284.),
+    //     radius: 60.,
+    //     material: metal_02.clone(),
+    // }));
+    // objects.push(Arc::new(Sphere {
+    //     center: Vec3::new(278., 60., 284.),
+    //     radius: 60.,
+    //     material: metal_05.clone(),
+    // }));
+    // objects.push(Arc::new(Sphere {
+    //     center: Vec3::new(417., 60., 284.),
+    //     radius: 60.,
+    //     material: metal_08.clone(),
+    // }));
+    // Cubes
+    objects.push(Arc::new(Cube::new(
+        Vec3::new(130., 0., 65.),
+        Vec3::new(295., 165., 230.),
+        white.clone(),
+        0.0,
+        f64::INFINITY,
+        &mut rng,
+    )));
+    objects.push(Arc::new(Cube::new(
+        Vec3::new(265., 0., 295.),
+        Vec3::new(430., 330., 460.),
+        white.clone(),
+        0.0,
+        f64::INFINITY,
+        &mut rng,
+    )));
 
     BvhNode::from_slice(&objects[..], 0.0, f64::INFINITY, &mut rng)
 }
