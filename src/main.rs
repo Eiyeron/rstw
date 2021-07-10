@@ -99,6 +99,20 @@ fn earth(center: Vec3, radius: f64) -> Arc<Sphere> {
     })
 }
 
+// Hehehe
+fn flat_earth(min: Vec2, max: Vec2, k: f64) -> Arc<XzPlane> {
+    let earth_texture = Arc::new(ImageTexture::from_path("data/longlat.png"));
+    let earth_mat = Arc::new(Lambertian {
+        albedo: earth_texture,
+    });
+    Arc::new(XzPlane {
+        min,
+        max,
+        k,
+        material: earth_mat,
+    })
+}
+
 fn _wave_scene() -> BvhNode {
     let lambertian: Arc<dyn Material> = Arc::new(Lambertian {
         albedo: Arc::new(SolidColor::new(0.2, 0.4, 0.6)),
@@ -161,7 +175,7 @@ fn _wave_scene() -> BvhNode {
     BvhNode::from_slice(&objects[..], 0.0, f64::INFINITY, &mut rng)
 }
 
-fn book_cover_scene() -> BvhNode {
+fn _book_cover_scene() -> BvhNode {
     let mut world_elements: Vec<Arc<dyn Hittable>> = vec![];
     let mut rng = SmallRng::seed_from_u64(0xDEADBEEF);
 
@@ -176,12 +190,13 @@ fn book_cover_scene() -> BvhNode {
         depth: 5,
     });
 
-    let ground_mat = Arc::new(Lambertian { albedo: noise });
-    world_elements.push(Arc::new(Sphere {
-        center: Vec3::new(0.0, -1000.0, 0.0),
-        radius: 1000.0,
-        material: ground_mat,
-    }));
+    // let ground_mat = Arc::new(Lambertian { albedo: noise });
+    // world_elements.push(Arc::new(Sphere {
+    //     center: Vec3::new(0.0, -1000.0, 0.0),
+    //     radius: 1000.0,
+    //     material: ground_mat,
+    // }));
+    world_elements.push(flat_earth(Vec2::new(-20., -20.), Vec2::new(20., 20.), 0.));
 
     let material_distribution = Uniform::from(0..4);
 
@@ -303,6 +318,96 @@ fn book_cover_scene() -> BvhNode {
     BvhNode::from_slice(&world_elements[..], 0.0, f64::INFINITY, &mut rng)
 }
 
+fn cornell_box() -> BvhNode {
+    let mut objects: Vec<Arc<dyn Hittable>> = vec![];
+    let mut rng = SmallRng::seed_from_u64(0xDEADBEEF);
+
+    let red = Arc::new(Lambertian {
+        albedo: Arc::new(SolidColor::new(0.65, 0.05, 0.05)),
+    });
+    let white = Arc::new(Lambertian {
+        albedo: Arc::new(SolidColor::new(0.73, 0.73, 0.73)),
+    });
+    let green = Arc::new(Lambertian {
+        albedo: Arc::new(SolidColor::new(0.12, 0.45, 0.15)),
+    });
+
+    let light = Arc::new(DiffuseLight {
+        emissive: Arc::new(SolidColor::new(15., 15., 15.)),
+    });
+
+    let metal_02 = Arc::new(Metal {
+        albedo: Arc::new(SolidColor::new(0.8, 0.8, 0.8)),
+        roughness: 0.2,
+    });
+    let metal_05 = Arc::new(Metal {
+        albedo: Arc::new(SolidColor::new(0.8, 0.8, 0.8)),
+        roughness: 0.5,
+    });
+    let metal_08 = Arc::new(Metal {
+        albedo: Arc::new(SolidColor::new(0.8, 0.8, 0.8)),
+        roughness: 0.8,
+    });
+
+    // Left and right
+    objects.push(Arc::new(YzPlane {
+        min: Vec2::new(0., 0.),
+        max: Vec2::new(555., 555.),
+        k: 555.,
+        material: green.clone(),
+    }));
+    objects.push(Arc::new(YzPlane {
+        min: Vec2::new(0., 0.),
+        max: Vec2::new(555., 555.),
+        k: 0.,
+        material: red.clone(),
+    }));
+    // Top and bottom
+    objects.push(Arc::new(XzPlane {
+        min: Vec2::new(0., 0.),
+        max: Vec2::new(555., 555.),
+        k: 0.,
+        material: white.clone(),
+    }));
+    objects.push(Arc::new(XzPlane {
+        min: Vec2::new(0., 0.),
+        max: Vec2::new(555., 555.),
+        k: 555.,
+        material: white.clone(),
+    }));
+    // Back
+    objects.push(Arc::new(XyPlane {
+        min: Vec2::new(0., 0.),
+        max: Vec2::new(555., 555.),
+        k: 555.,
+        material: white.clone(),
+    }));
+    // Light
+    objects.push(Arc::new(XzPlane {
+        min: Vec2::new(213., 227.),
+        max: Vec2::new(343., 342.),
+        k: 554.,
+        material: light.clone(),
+    }));
+    objects.push(Arc::new(Sphere {
+        center: Vec3::new(139., 60., 284.),
+        radius: 60.,
+        material: metal_02.clone(),
+    }));
+    objects.push(Arc::new(Sphere {
+        center: Vec3::new(278., 60., 284.),
+        radius: 60.,
+        material: metal_05.clone(),
+    }));
+    objects.push(Arc::new(Sphere {
+        center: Vec3::new(417., 60., 284.),
+        radius: 60.,
+        material: metal_08.clone(),
+    }));
+
+    BvhNode::from_slice(&objects[..], 0.0, f64::INFINITY, &mut rng)
+}
+
 fn main() {
     let args_maybe = TracerArgs::from_std();
     if let None = args_maybe {
@@ -316,16 +421,19 @@ fn main() {
     let render_width = arguments.width;
     let render_height = arguments.height;
     let aspect_ratio = render_width as f64 / render_height as f64;
-    let eye = Vec3::new(0.0, 2.0, -5.0);
-    let target = Vec3::zeros();
-    let world = Arc::new(book_cover_scene());
+    let eye = Vec3::new(278., 278., -800.);
+    let target = Vec3::new(278., 278., 0.);
+    // let eye = Vec3::new(0.0, 2.0, -10.0);
+    // let target = Vec3::zeros();
+    // let world = Arc::new(book_cover_scene());
+    let world = Arc::new(cornell_box());
     let before = Instant::now();
     // Camera derives Copy+Clone, the structure will be copied to the threads.
     let cam = Camera::new(
         eye,
         target,
         Vec3::new(0.0, 1.0, 0.0),
-        60.,
+        40., //60.,
         aspect_ratio,
         0.0, // Aperture
         (eye - target).norm(),

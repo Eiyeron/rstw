@@ -231,3 +231,135 @@ fn ray_sphere_intersection(
     let outward_normal = (new_point - center) / radius;
     Some((root, new_point, outward_normal))
 }
+
+pub struct XyPlane {
+    pub min: Vec2,
+    pub max: Vec2,
+    pub k: f64,
+    pub material: Arc<dyn Material>,
+}
+
+impl Hittable for XyPlane {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let t = (self.k - ray.origin.z) / ray.direction.z;
+
+        if t < t_min || t > t_max {
+            return None;
+        }
+
+        let x = ray.origin.x + t * ray.direction.x;
+        let y = ray.origin.y + t * ray.direction.y;
+
+        if x < self.min.x || x > self.max.x || y < self.min.y || y > self.max.y {
+            return None;
+        }
+
+        let u = (x - self.min.x) / (self.max.x - self.min.x);
+        let v = (y - self.min.y) / (self.max.y - self.min.y);
+
+        Some(HitRecord::from_uv(
+            t,
+            ray.at(t),
+            ray.direction,
+            Vec3::new(0., 0., 1.),
+            self.material.as_ref(),
+            u,
+            v,
+        ))
+    }
+
+    fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
+        Some(AABB {
+            min: Vec3::new(self.min.x, self.min.y, self.k - 1e-4),
+            max: Vec3::new(self.max.x, self.max.y, self.k + 1e-4),
+        })
+    }
+}
+
+pub struct XzPlane {
+    pub min: Vec2,
+    pub max: Vec2,
+    pub k: f64,
+    pub material: Arc<dyn Material>,
+}
+
+impl Hittable for XzPlane {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let t = (self.k - ray.origin.y) / ray.direction.y;
+
+        if t < t_min || t > t_max {
+            return None;
+        }
+
+        let x = ray.origin.x + t * ray.direction.x;
+        let z = ray.origin.z + t * ray.direction.z;
+
+        if x < self.min.x || x > self.max.x || z < self.min.y || z > self.max.y {
+            return None;
+        }
+
+        let u = (x - self.min.x) / (self.max.x - self.min.x);
+        let v = (z - self.min.y) / (self.max.y - self.min.y);
+
+        Some(HitRecord::from_uv(
+            t,
+            ray.at(t),
+            ray.direction,
+            Vec3::new(0., 1., 0.),
+            self.material.as_ref(),
+            u,
+            v,
+        ))
+    }
+
+    fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
+        Some(AABB {
+            min: Vec3::new(self.min.x, self.k - 1e-4, self.min.y),
+            max: Vec3::new(self.max.x, self.k + 1e-4, self.max.y),
+        })
+    }
+}
+
+pub struct YzPlane {
+    pub min: Vec2,
+    pub max: Vec2,
+    pub k: f64,
+    pub material: Arc<dyn Material>,
+}
+
+impl Hittable for YzPlane {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let t = (self.k - ray.origin.x) / ray.direction.x;
+
+        if t < t_min || t > t_max {
+            return None;
+        }
+
+        let y = ray.origin.y + t * ray.direction.y;
+        let z = ray.origin.z + t * ray.direction.z;
+
+        if y < self.min.x || y > self.max.x || z < self.min.y || z > self.max.y {
+            return None;
+        }
+
+        let u = (y - self.min.x) / (self.max.x - self.min.x);
+        let v = (z - self.min.y) / (self.max.y - self.min.y);
+
+        Some(HitRecord::from_uv(
+            t,
+            ray.at(t),
+            ray.direction,
+            Vec3::new(1., 0., 0.),
+            self.material.as_ref(),
+            u,
+            v,
+        ))
+    }
+
+    fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
+        Some(AABB {
+            min: Vec3::new(self.k - 1e-4, self.min.x, self.min.y),
+            max: Vec3::new(self.k + 1e-4, self.max.x, self.max.y),
+        })
+    }
+}

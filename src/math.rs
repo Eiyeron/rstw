@@ -2,6 +2,7 @@ use crate::Ray;
 use rand::distributions::Distribution;
 use rand::RngCore;
 
+pub type Vec2 = nalgebra::Vector2<f64>;
 pub type Vec3 = nalgebra::Vector3<f64>;
 
 pub fn vpowf(v: &Vec3, factor: f64) -> Vec3 {
