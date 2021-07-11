@@ -1,7 +1,7 @@
 use crate::material::Material;
 use crate::math::*;
 use crate::{HitRecord, Ray};
-use nalgebra::Vector3;
+use nalgebra::Unit;
 use rand::RngCore;
 use rand_distr::{Distribution, Uniform};
 use std::sync::Arc;
@@ -13,13 +13,140 @@ pub trait Hittable: Sync + Send {
     fn bounding_box(&self, t0: f64, t1: f64) -> Option<AABB>;
 }
 
+// - Transform -
+
+pub struct Transform {
+    transform: Mat4,
+    inv_transform: Mat4,
+    normal_mat: Mat4,
+    inv_normal: Mat4,
+    child: Arc<dyn Hittable>,
+    bbox: Option<AABB>,
+}
+
+impl Transform {
+    pub fn new(transform: &Mat4, child: Arc<dyn Hittable>) -> Transform {
+        let bbox = Transform::get_transformed_bbox(0., 1., transform, &child);
+        let mut rot_only = transform.clone();
+        rot_only[(0, 3)] = 0.;
+        rot_only[(1, 3)] = 0.;
+        rot_only[(2, 3)] = 0.;
+        rot_only[(3, 3)] = 1.;
+
+        Transform {
+            transform: transform.clone(),
+            inv_transform: transform.try_inverse().unwrap(),
+            normal_mat: rot_only,
+            inv_normal: rot_only.try_inverse().unwrap(),
+            child,
+            bbox,
+        }
+    }
+
+    fn get_transformed_bbox(
+        t0: f64,
+        t1: f64,
+        transform: &Mat4,
+        child: &Arc<dyn Hittable>,
+    ) -> Option<AABB> {
+        let bbox = child.bounding_box(t0, t1);
+        if let None = bbox {
+            return None;
+        }
+
+        let bbox = bbox.unwrap();
+
+        let mut vmin = Vec3::from_element(f64::INFINITY);
+        let mut vmax = Vec3::from_element(f64::NEG_INFINITY);
+
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    let i = i as f64;
+                    let j = j as f64;
+                    let k = k as f64;
+
+                    let x = i * bbox.max.x + (1. - i) * bbox.min.x;
+                    let y = j * bbox.max.y + (1. - j) * bbox.min.y;
+                    let z = k * bbox.max.z + (1. - k) * bbox.min.z;
+
+                    let new_vec = (transform * Vec4::new(x, y, z, 1.)).xyz();
+                    vmin = vmin.zip_map(&new_vec, f64::min);
+                    vmax = vmax.zip_map(&new_vec, f64::max);
+                }
+            }
+        }
+
+        Some(AABB::new(vmin, vmax))
+    }
+
+    pub fn from_rot_x(angle: f64, child: Arc<dyn Hittable>) -> Transform {
+        let axis = Unit::new_normalize(Vec3::new(1., 0., 0.));
+        Transform::new(&Mat4::from_axis_angle(&axis, angle), child)
+    }
+
+    pub fn from_rot_y(angle: f64, child: Arc<dyn Hittable>) -> Transform {
+        let axis = Unit::new_normalize(Vec3::new(0., 1., 0.));
+        Transform::new(&Mat4::from_axis_angle(&axis, angle), child)
+    }
+
+    pub fn from_rot_z(angle: f64, child: Arc<dyn Hittable>) -> Transform {
+        let axis = Unit::new_normalize(Vec3::new(0., 0., 1.));
+        Transform::new(&Mat4::from_axis_angle(&axis, angle), child)
+    }
+}
+
+impl Hittable for Transform {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let origin = Vec4::new(ray.origin.x, ray.origin.y, ray.origin.z, 1.);
+        let dir = Vec4::new(ray.direction.x, ray.direction.y, ray.direction.z, 1.);
+
+        let inverse_origin = self.inv_transform * origin;
+        let inverse_dir = self.inv_normal * dir;
+
+        let record = self.child.hit(
+            &Ray {
+                origin: inverse_origin.xyz(),
+                direction: inverse_dir.xyz(),
+                time: ray.time,
+            },
+            t_min,
+            t_max,
+        );
+        if record.is_none() {
+            return None;
+        }
+
+        let record = record.unwrap();
+        let p = Vec4::new(record.p.x, record.p.y, record.p.z, 1.);
+        let p = self.transform * p;
+        let normal = Vec4::new(record.normal.x, record.normal.y, record.normal.z, 1.);
+
+        let normal = self.normal_mat * normal;
+
+        Some(HitRecord {
+            front_facing: record.front_facing,
+            material: record.material,
+            normal: normal.xyz().normalize(),
+            t: record.t,
+            p: p.xyz(),
+            u: record.u,
+            v: record.v,
+        })
+    }
+
+    fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
+        self.bbox.clone()
+    }
+}
+
+// - Sphere -
+
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f64,
     pub material: Arc<dyn Material>,
 }
-
-// - Sphere -
 
 impl Sphere {
     pub fn get_uv(p: &Vec3) -> (f64, f64) {
@@ -50,7 +177,7 @@ impl Hittable for Sphere {
     }
 
     fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
-        let radius_vector = Vector3::from_element(self.radius);
+        let radius_vector = Vec3::from_element(self.radius);
         Some(AABB::new(
             self.center - radius_vector,
             self.center + radius_vector,
@@ -276,14 +403,7 @@ pub struct Cube {
 }
 
 impl Cube {
-    pub fn new(
-        min: Vec3,
-        max: Vec3,
-        material: Arc<dyn Material>,
-        t0: f64,
-        t1: f64,
-        rng: &mut impl RngCore,
-    ) -> Cube {
+    pub fn new(min: Vec3, max: Vec3, material: Arc<dyn Material>, rng: &mut impl RngCore) -> Cube {
         let mut side_vec: Vec<Arc<dyn Hittable>> = vec![];
 
         side_vec.push(Arc::new(XyPlane {
@@ -326,7 +446,7 @@ impl Cube {
         }));
 
         Cube {
-            sides: HittableList::from_slice(&side_vec, t0, t1, rng),
+            sides: HittableList::from_slice(&side_vec, 0., 1., rng),
             bbox: AABB::new(min, max),
         }
     }
@@ -337,7 +457,7 @@ impl Hittable for Cube {
         self.sides.hit(ray, t_min, t_max)
     }
 
-    fn bounding_box(&self, t0: f64, t1: f64) -> Option<AABB> {
+    fn bounding_box(&self, _t0: f64, _t1: f64) -> Option<AABB> {
         Some(self.bbox.clone())
     }
 }

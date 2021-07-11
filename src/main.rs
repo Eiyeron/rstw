@@ -184,11 +184,11 @@ fn _book_cover_scene() -> BvhNode {
         albedo_even: Arc::new(SolidColor::new(0.6, 0.6, 0.2)),
     });
 
-    let noise = Arc::new(MarbleNoise {
-        perlin: Perlin::new(&mut rng),
-        scale: 4.,
-        depth: 5,
-    });
+    // let noise = Arc::new(MarbleNoise {
+    //     perlin: Perlin::new(&mut rng),
+    //     scale: 4.,
+    //     depth: 5,
+    // });
 
     // let ground_mat = Arc::new(Lambertian { albedo: noise });
     // world_elements.push(Arc::new(Sphere {
@@ -336,18 +336,18 @@ fn cornell_box() -> BvhNode {
         emissive: Arc::new(SolidColor::new(15., 15., 15.)),
     });
 
-    let metal_02 = Arc::new(Metal {
-        albedo: Arc::new(SolidColor::new(0.8, 0.8, 0.8)),
-        roughness: 0.2,
-    });
-    let metal_05 = Arc::new(Metal {
-        albedo: Arc::new(SolidColor::new(0.8, 0.8, 0.8)),
-        roughness: 0.5,
-    });
-    let metal_08 = Arc::new(Metal {
-        albedo: Arc::new(SolidColor::new(0.8, 0.8, 0.8)),
-        roughness: 0.8,
-    });
+    // let metal_02 = Arc::new(Metal {
+    //     albedo: Arc::new(SolidColor::new(0.8, 0.8, 0.8)),
+    //     roughness: 0.2,
+    // });
+    // let metal_05 = Arc::new(Metal {
+    //     albedo: Arc::new(SolidColor::new(0.8, 0.8, 0.8)),
+    //     roughness: 0.5,
+    // });
+    // let metal_08 = Arc::new(Metal {
+    //     albedo: Arc::new(SolidColor::new(0.8, 0.8, 0.8)),
+    //     roughness: 0.8,
+    // });
 
     // Left and right
     objects.push(Arc::new(YzPlane {
@@ -406,22 +406,27 @@ fn cornell_box() -> BvhNode {
     //     material: metal_08.clone(),
     // }));
     // Cubes
-    objects.push(Arc::new(Cube::new(
-        Vec3::new(130., 0., 65.),
-        Vec3::new(295., 165., 230.),
+    let cube_mat = Mat4::new_rotation(Vec3::new(0., 1., 0.) * f64::to_radians(15.));
+    let cube_mat = cube_mat.append_translation(&Vec3::new(265., 0., 295.));
+
+    let cube = Arc::new(Cube::new(
+        Vec3::new(-82.5 * 0., 0., -82.5 * 0.),
+        Vec3::new(82.5 * 2., 330., 82.5 * 2.),
         white.clone(),
-        0.0,
-        f64::INFINITY,
         &mut rng,
-    )));
-    objects.push(Arc::new(Cube::new(
-        Vec3::new(265., 0., 295.),
-        Vec3::new(430., 330., 460.),
+    ));
+    objects.push(Arc::new(Transform::new(&cube_mat, cube)));
+
+    let cube_mat = Mat4::new_rotation(Vec3::new(0., 1., 0.) * f64::to_radians(-18.));
+    let cube_mat = cube_mat.append_translation(&Vec3::new(130., 0., 65.));
+
+    let cube = Arc::new(Cube::new(
+        Vec3::new(0., 0., 0.),
+        Vec3::new(165., 165., 165.),
         white.clone(),
-        0.0,
-        f64::INFINITY,
         &mut rng,
-    )));
+    ));
+    objects.push(Arc::new(Transform::new(&cube_mat, cube)));
 
     BvhNode::from_slice(&objects[..], 0.0, f64::INFINITY, &mut rng)
 }

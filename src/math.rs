@@ -4,6 +4,9 @@ use rand::RngCore;
 
 pub type Vec2 = nalgebra::Vector2<f64>;
 pub type Vec3 = nalgebra::Vector3<f64>;
+pub type Vec4 = nalgebra::Vector4<f64>;
+pub type Mat3 = nalgebra::Matrix3<f64>;
+pub type Mat4 = nalgebra::Matrix4<f64>;
 
 pub fn vpowf(v: &Vec3, factor: f64) -> Vec3 {
     v.map(|f| f.powf(factor))
@@ -17,7 +20,7 @@ pub fn vmax(a: &Vec3, b: &Vec3) -> Vec3 {
     a.zip_map(b, f64::max)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AABB {
     pub min: Vec3,
     pub max: Vec3,
